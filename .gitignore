@@ -1,0 +1,26 @@
+# Python virtual environment (~5.5GB) -- regenerate with:
+#   python3 -m venv env/.venv && env/.venv/bin/pip install numpy nibabel matplotlib \
+#     pandas scipy torch scikit-learn lifelines
+# (CUDA torch build for the sbatch jobs: `pip install torch`, no --index-url;
+# see PROGRESS.md for the CPU-vs-CUDA build history.)
+env/
+
+# Cached per-organ crops (~14GB) -- regenerate with src/cache_organ_crops.py
+# (reads data/pid_lists/subset_v1.csv, which IS tracked).
+data/organ_crops/
+
+# Trained 3D CNN checkpoints -- regenerate via src/submit_stage3_cnn3d.sh
+models/*.pt
+
+# Slurm job logs -- ephemeral, recreated per job submission
+logs/*.out
+logs/*.err
+
+# Python
+__pycache__/
+*.pyc
+
+# Editor swap/undo files
+*.swp
+*.swo
+*.un~
