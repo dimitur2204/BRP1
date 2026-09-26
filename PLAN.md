@@ -41,7 +41,7 @@ Decisions confirmed with the user:
   be stratified to guarantee enough events to learn from and to split into
   legible KM groups.
 
-## Status: Stages 0-2 done, Stage 3 (CNN) not started
+## Status: Stages 0-6 done for `lungs`/`anterior_mediastinum`; Stage 5 pending for the other 5 organs
 
 See `PROGRESS.md` for the detailed running log (what was built, what was
 found, decisions made). Summary:
@@ -72,8 +72,24 @@ found, decisions made). Summary:
   limitation, not absence of signal. See `PROGRESS.md` for the full read,
   including the caveats on `anterior_mediastinum`'s borderline CI and
   uncalibrated 0.5 threshold.
-- **Stage 5/6** — not started. Natural next step: KM curve using `lungs`
-  and/or `anterior_mediastinum` as the risk score.
+- **Stage 5** ✅/🔄 `src/stage5_km_curve.py`, `figs/stage5_km_curve/`,
+  `data/stage5_results.csv` — Kaplan-Meier curves from the Stage 3v2 CNN's
+  risk score, tertile split, `multivariate_logrank_test` (mentor's exact
+  convention). `lungs` validated: logrank p=0.037. The other 6 organs
+  (including `anterior_mediastinum`) are pending the user running
+  `sbatch src/submit_stage5_km.sh`.
+- **Stage 6** ✅ `src/stage6_saliency.py`, `data/saliency/`,
+  `figs/stage6_saliency/`, `data/stage6_saliency_manifest.csv` — Grad-CAM
+  saliency maps (which voxels drove each prediction) for `lungs` and
+  `anterior_mediastinum`, 20 patients (5 high-risk + 5 low-risk each).
+  Full-CT-space `.nii.gz` per patient (aligned with the source scan's own
+  affine) + PNG overlays + per-organ overview montages. Took 2 job
+  submissions to land (first got stuck behind `gpu-l40s`'s single, fully-
+  occupied node; second hit its own time limit mid-run) — see `PROGRESS.md`
+  for the full troubleshooting history. `anterior_mediastinum`'s CAMs
+  consistently localize to the mediastinal ROI with a clean-looking
+  high/low risk split, though its Stage 4 AUC CI still barely excludes
+  chance, so this is a promising pattern, not a confirmed result.
 
 ## New project folder (this one)
 
@@ -154,7 +170,22 @@ frame, see `data/pid_lists/README.md`) rather than changing method. Output:
 `figs/stage5_km_curve.png` with risk table, matching the mentor's plotting
 style.
 
-**Stage 6 (stretch, optional) — Benchmark against the mentor's approach.**
+**Stage 6 — Grad-CAM saliency maps.**
+For `lungs` and `anterior_mediastinum` only (the validated positive control
+and the actual scientific target), compute Grad-CAM (Selvaraju et al. 2017)
+on the Stage 3v2 CNN's last conv layer (`Simple3DCNN.features[12]`) for the
+5 highest- and 5 lowest-risk test-set patients per organ. The cached crop's
+bounding-box offset isn't stored anywhere, so it's recomputed from the
+original CT+seg for each selected patient (and checked against the cached
+crop's shape) to reproject the CAM into full-CT space. Output:
+`data/saliency/{organ}/{pid}_gradcam.nii.gz` (aligned with the source CT's
+affine — loads correctly in any NIfTI viewer next to the original scan),
+`figs/stage6_saliency/{organ}/{pid}_montage.png` (CT + overlay), and
+`figs/stage6_saliency/{organ}_overview.png` (high-risk vs low-risk grid).
+Organs whose Stage 4 AUC CI spans chance are captioned as such, not
+presented at face value.
+
+**Stage 7 (stretch, optional) — Benchmark against the mentor's approach.**
 Reuse precomputed `derived/dino_organ_emb/{pid}_yr0.npz` embeddings for the
 same student subset + a plain CoxNet (no deconfounding) to see how far the
 simple CNN approach falls short of the full discovery pipeline — a graduation
@@ -189,3 +220,8 @@ point, not a required step.
 - Stage 5: KM curves should show visually separated tertile survival curves
   with a `multivariate_logrank_test` p-value reported (not necessarily
   significant given the small subset — report honestly either way).
+- Stage 6: recomputed bbox shape must exactly match the cached crop's own
+  shape for every processed patient (hard assertion in the script, not just
+  a visual check); load one output `.nii.gz` next to its source CT and
+  confirm shape/affine match; visually confirm `lungs`' high-risk CAMs land
+  on plausible parenchymal regions rather than scan borders/margins.

@@ -318,6 +318,117 @@ sequentially at that rate (~1h), packaged Stage 5 as a quick GPU job instead:
 `src/submit_stage5_km.sh` (same `$TMPDIR`-staging pattern as Stage 3v2),
 handed to the user to submit via `sbatch src/submit_stage5_km.sh`.
 
-## Next: once the Stage 5 GPU job completes, review all 7 KM curves
-(headlining `lungs` and `anterior_mediastinum`), and decide whether to
-pursue Stage 6 (benchmark against the mentor's frozen 3DINO embeddings).
+## Stage 6 — Grad-CAM saliency maps (`src/stage6_saliency.py`)
+
+User asked to see "which parts of the image led to the result" and to write
+it out as a NIfTI/similar for visualization. That's **Grad-CAM**
+(Gradient-weighted Class Activation Mapping, Selvaraju et al. 2017) — no new
+model needed, just inspection of the checkpoints Stage 3v2 already saved.
+Scoped to `lungs` + `anterior_mediastinum` only, per the user's explicit
+narrowing (the validated positive control and the actual scientific target,
+not all 7 organs).
+
+**Method:**
+1. Hook `Simple3DCNN.features[12]` (the last `Conv3d(64→128)` before
+   `AdaptiveAvgPool3d`) for forward activations `A` and backward gradients
+   `dY/dA`.
+2. `alpha_k = mean_spatial(dY/dA_k)`; `CAM = ReLU(sum_k alpha_k * A_k)`,
+   shape `[8,8,8]`, normalized per-patient by its own max.
+3. Upsample the 8³ CAM directly to the crop's *native* resolution (trilinear,
+   `align_corners=False`, same convention as `resize_and_window()`).
+4. **Reproject into full-CT space.** Found during planning: the crop's
+   bounding-box offset (`mask_zeroed_crop`'s `(lo, hi)` return value) is
+   discarded at its only call site in `cache_organ_crops.py` — never cached
+   anywhere. So the bbox is recomputed per patient by reloading the original
+   CT+seg and rerunning `organ_mask()` + the same bbox arithmetic — checked
+   with a hard assertion that the recomputed shape matches the cached crop's
+   shape before trusting the reprojection.
+5. Paste into a zero volume shaped like the full CT, save as
+   `nib.Nifti1Image(vol, affine=ct_img.affine)` — the *canonical* CT's own
+   affine (not identity), so it opens correctly aligned against the original
+   scan in any NIfTI viewer.
+6. PNG montage per patient (CT + CAM alpha-blended, sequential `"hot"`
+   colormap since Grad-CAM is non-negative — unlike the mentor's signed IG
+   in `code/organ_saliency.py`, which uses diverging `RdBu_r`), axial slice
+   at peak CAM energy, matching `code/render_saliency_overlays.py`'s
+   HU-window conventions.
+
+Scope: 5 highest-risk + 5 lowest-risk test-set patients per organ (reusing
+`stage5_km_curve.risk_scores_for_test()`), 20 patients total.
+
+**Smoke-tested on the login node (CPU, 2 patients: one event=1, one
+event=0)** before handing off the sbatch job:
+- Bbox-recomputation assertion passed silently for both patients.
+- Output `.nii.gz` shape (260,260,144) and affine matched the source CT
+  exactly (`derived/ct_1x1x2mm/118669_yr0.nii.gz`) — confirmed with
+  `nib.load(...).shape`/`.affine` on both.
+- Visual check of the montage: overlay is spatially correct (sits right
+  over the lungs, not shifted), but fairly coarse/smeared — expected, since
+  an 8³ CAM upsampled ~30x will never have crisp edges. The highest-risk
+  smoke-test patient's CAM concentrated more in the mediastinum/between the
+  lungs than on any specific parenchymal nodule; noted here as an honest
+  observation, not something to touch up before showing the real batch's
+  results.
+- Full-test-set patient selection (`risk_scores_for_test`) itself is slow on
+  the login node (~10 min/organ, same bottleneck as Stage 5's login-node
+  run) — this is why Stage 6 also goes through `sbatch` despite not needing
+  a GPU computationally; `submit_stage6_saliency.sh` stages only the 2
+  needed organs' crop subfolders to `$TMPDIR` (not all 7).
+- Smoke-test output files deleted afterward so the real run starts clean.
+
+**Job history (2 submissions, both real findings, not hidden):**
+1. `gpu-l40s`, `--time 00:15:00` (job 64798970) — sat **PENDING** the whole
+   time (`squeue` reason: `Resources`). Checked `sinfo`/`gnodes`: `gpu-l40s`
+   is exactly **one node** (`gn-1002`) cluster-wide, shared with the plain
+   `gpu` partition, and it was fully occupied (all 7 GPUs marked busy).
+   Since this script doesn't actually need a GPU (Simple3DCNN is 4 conv
+   layers, trivial compute), switched to `short` (44 CPU nodes, 12h limit,
+   confirmed via `sacctmgr show assoc` that the account isn't restricted to
+   specific partitions) instead of waiting on the single contended GPU node.
+2. `short`, `--time 00:15:00` (job 64799090) — started immediately (good),
+   but hit the time limit and got killed (`sacct`: `TIMEOUT`) partway
+   through `anterior_mediastinum`. Root cause: staging the 8GB of `lungs` +
+   `anterior_mediastinum` crops to `$TMPDIR` (~800 small `.npy` files over
+   the network filesystem) alone took **10.5 of the 15 minutes**. `lungs`
+   fully completed (10 patients + overview) in the remaining time;
+   `anterior_mediastinum` got through 7/10 patients before being cancelled
+   — no manifest CSV was written (that only happens once, after all organs
+   finish), but every patient's individual `.nii.gz`/`.png` that *did*
+   complete was valid and saved.
+3. `short`, `--time 00:45:00` (job 64802239) — **COMPLETED**, 15:15 used out
+   of 45:00 reserved. All 20 patients (both organs) processed; manifest
+   written; both `_overview.png` figures produced.
+
+**Bug found reviewing the real run's output (not the smoke test):** the
+`anterior_mediastinum_overview.png` had row-2 (low-risk) panel titles
+overlapping into row-1's images — `fig.tight_layout(rect=(0,0,1,0.94))`
+wasn't giving the 2-row grid enough vertical room. Fixed the same way as
+the earlier Stage 2 QC-figure overlap bug: `h_pad=3.0` + taller figsize +
+`suptitle(y=0.995)`. Regenerated both `_overview.png` files directly from
+the already-saved `.nii.gz`+source CT (no need to rerun the CNN/Grad-CAM/
+bbox-recompute pipeline — the full-CT-space CAM was already on disk) via a
+throwaway script, not a full sbatch resubmission.
+
+**Visual review of the real (non-smoke-test) results:**
+- `lungs`: high-risk patients' hottest CAM region is often central/
+  mediastinal rather than clearly inside lung parenchyma, and the crop
+  bounding box isn't always symmetric across both lungs (e.g. pid 102167's
+  box leans toward one side) — consistent with the earlier note that an
+  8³ CAM upsampled ~30x will be coarse, and a reminder that this is "what
+  correlates with the model's score," not a verified tumor localizer.
+  Low-risk patients' CAMs still light up somewhere (Grad-CAM highlights
+  what drove *whatever* the logit was, including a confidently-low one —
+  not "nothing," which is expected behavior, not a bug).
+- `anterior_mediastinum`: the crop bounding box is tightly and consistently
+  centered on the mediastinal ROI across all 10 patients (mask geometry
+  behaving correctly), and within it the CAM concentrates on a well-defined
+  rounded structure near the great vessels for most high-risk patients.
+  4/5 high-risk patients saturate at risk≈1.00 and the low-risk group
+  ranges 0.05-0.46 — a clean-looking split in this sample, but this organ's
+  Stage 4 AUC CI [0.504, 0.796] barely excludes chance, so this is reported
+  as an interesting pattern worth a closer look, not a confirmed result.
+
+## Next: once the user runs `submit_stage5_km.sh` for the remaining 6
+organs' KM curves, review all outputs together (Stage 5 + Stage 6) and
+decide whether to pursue Stage 7 (benchmark against the mentor's frozen
+3DINO embeddings).

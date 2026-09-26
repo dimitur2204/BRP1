@@ -24,3 +24,6 @@ __pycache__/
 *.swp
 *.swo
 *.un~
+
+# Grad-CAM volumes (~254MB .nii.gz) -- regenerate via src/submit_stage6_saliency.sh
+data/saliency/
