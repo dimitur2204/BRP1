@@ -1,227 +1,176 @@
-# Learning pipeline → Kaplan-Meier survival curve (multi-organ CNN sweep)
+# Heart radiomics → lung-cancer risk (DeepSurv + baselines → KM)
 
-## Context
+## Question
 
-The mentor's `discovery_pipeline/` already produces organ-level lung-cancer
-risk scores via a sophisticated stack: TotalSegmentator → frozen 3DINO-ViT
-embeddings → adversarially-deconfounded CoxNet/RSF models → `lifelines` KM
-curves, run on the full ~26k-patient NLST cohort. That stack is a black box to
-someone new to the project — the goal here is a separate, smaller, from-first-
-principles pipeline that reaches the *same kind of output* (a KM curve, and a
-ranking of which organs carry lung-cancer signal) using models the user
-already understands (a plain CNN classifier), so the underlying concepts are
-visible and inspectable at every step, not just the end result.
+Do quantitative **radiomic features of the heart** on the NLST baseline
+low-dose CT carry information about **future lung-cancer incidence**, beyond
+basic clinical covariates? Deliberately exploratory and novel: a null result
+is an acceptable, reportable outcome. It is not a failure.
 
-Three requirements drove the design (from the user directly):
-1. Visualize the data at every pipeline stage, not just the final curve.
-2. Start with simple, familiar models (a CNN) before anything like frozen
-   embeddings + Cox models — the mentor's stack becomes an optional later
-   benchmark, not the starting point.
-3. Work on a deliberately small, self-selected NLST subset (mirroring the
-   mentor's own precedent of starting with the small IDC-780 package before
-   scaling up), rather than the full cohort or the full multi-terabyte
-   `derived/` tree.
+The previous multi-organ CNN pipeline (Stages 0–6, commit `eb3b89b`) found
+the heart **at chance** for this outcome (3D CNN test AUC CI spanning 0.5,
+n=127 test). This project asks the same question with a completely different
+representation: roughly 100 hand-defined, interpretable features instead of
+learned image filters, on about 16× more patients.
 
-Decisions confirmed with the user:
-- **Multi-organ sweep from the start** (not single-organ-first) — the goal is
-  literally to identify *which* organs are informative, so the CNN classifier
-  is trained per-organ across ~5–10 organs from the outset, not just added as
-  a later ranking step.
-- **Segmentation is a given, off-the-shelf tool, not a learning target.**
-  Reuse the mentor's precomputed TotalSegmentator masks
-  (`derived/totalseg_fullres/{pid}_yr0/seg.nii.gz`) rather than retraining a
-  segmenter. `totalseg_fullres` has tens of thousands of per-patient folders
-  — the fix is to never enumerate/copy that whole tree; only ever look up the
-  handful of `{pid}_yr0` folders belonging to our chosen subset, by pid,
-  directly.
-- **Subset size: ~150–400 patients, stratified by event**, not the full
-  cohort and not the mentor's exact 780-patient scale. NLST incidence is low
-  (the mentor's full cohort had ~1,061 events / 26,254 patients, ~4%), so a
-  random sample this size would contain almost no positives — the subset must
-  be stratified to guarantee enough events to learn from and to split into
-  legible KM groups.
+## Feasibility assessment (why this is worth doing, and what can go wrong)
 
-## Status: Stages 0-6 done for `lungs`/`anterior_mediastinum`; Stage 5 pending for the other 5 organs
+**Plausible routes by which heart features could relate to lung cancer:**
+1. **Smoking burden proxy.** Coronary calcification tracks cumulative smoking
+   exposure. We have smoking *status* but **not pack-years**, so heart features
+   may pick up the unmeasured intensity of smoking. That would be real signal,
+   but it is a proxy, not cardiac biology. It must be interpreted that way.
+2. **Emphysema / hyperinflation.** Hyperinflated lungs compress the heart
+   and make it more vertical, so heart volume and shape change. Emphysema is
+   an established lung-cancer risk factor. Heart *shape* features could
+   therefore carry lung signal indirectly.
+3. **Age / systemic inflammation.** Heart density, calcium and pericardial fat
+   all change with age. This is why the clinical baseline is mandatory.
 
-See `PROGRESS.md` for the detailed running log (what was built, what was
-found, decisions made). Summary:
+**Threats:**
+- **Scanner/kernel confounding.** Radiomic texture features are highly
+  sensitive to reconstruction kernel. The manifest mixes STANDARD, B30f, C,
+  FC51, B50f, BONE and others. Stage R3 must probe and harmonize this, or
+  "signal" may just be which site scanned which patient.
+- **Non-contrast, low-dose CT.** Heart chambers are not separable and texture
+  is noisy. Shape, first-order statistics, calcium and fat are expected to be
+  more robust than higher-order texture.
+- **Case-enriched cohort.** The enriched 6,373 cohort contains all 1,061
+  events but is not a random sample, and its splits are unbalanced (train
+  742/2,226 events = 33%; val 159/2,067 and test 160/2,080 ≈ 8%). Rankings
+  (C-index, KM separation, HRs) remain valid. **Absolute risk / calibration
+  / Brier scores are biased** and must be labelled as such.
+- **Multiple testing.** About 110 features are screened univariately, so
+  Benjamini–Hochberg FDR is applied and reported.
+- **Neural nets vs linear models on tabular data.** DeepSurv frequently fails
+  to beat Cox-LASSO at this sample size. The comparison itself is a result,
+  so it is reported either way.
 
-- **Stage 0** ✅ `data/pid_lists/subset_v1.csv` — 400 patients (120 positive /
-  280 negative), stratified from `enriched_cohort_pids.txt` ∩ `manifest.csv`,
-  verified to have a usable CT + TotalSegmentator mask *and* enough z-coverage
-  (a QC gate added after Stage 1 caught 3 partial-scan outliers).
-- **Stage 1** ✅ `figs/stage1_raw_ct/` — raw CT sanity-checked for 5 sample
-  patients (orientation, HU range, spacing all correct).
-- **Stage 2** ✅ `figs/stage2_masks/`, `data/organ_crops/` — 7-organ masking
-  (anterior_mediastinum, lungs, heart, aorta, liver, spleen, sternum) visually
-  verified, full-cohort crops cached.
-- **Stage 3v1** ✅ (2D baseline, superseded) `figs/stage3_cnn/`,
-  `data/stage3_results.csv` — CPU-friendly 2D-slice CNN. Result: 5/7 organs at
-  chance, and the `lungs` positive control also failed — see `PROGRESS.md`.
-  This motivated Stage 3v2 rather than trusting these numbers.
-- **Stage 3v2** ✅ (real 3D CNN, GPU) `src/stage3_cnn3d.py`,
-  `src/submit_stage3_cnn3d.sh`, `data/stage3_3d_results.csv` — user confirmed
-  Slurm GPU access (`gpu-l40s`), so the full 3D crop (not one slice) is fed to
-  a small 3D CNN, run via `sbatch`. Ran successfully (87% GPU util, 4 min).
-- **Stage 4** ✅ `figs/stage4_ranking_3d.png` — **`lungs` (pre-declared
-  positive control) and `anterior_mediastinum` (the thymus proxy — this
-  project's actual hypothesis) both show test AUC CIs that exclude chance**
-  (0.687 [0.543,0.831] and 0.650 [0.504,0.796] respectively); the other 5
-  organs remain at chance. `lungs` clearing as a positive control is the key
-  validation that Stage 3v1's failure was a single-2D-slice method
-  limitation, not absence of signal. See `PROGRESS.md` for the full read,
-  including the caveats on `anterior_mediastinum`'s borderline CI and
-  uncalibrated 0.5 threshold.
-- **Stage 5** ✅/🔄 `src/stage5_km_curve.py`, `figs/stage5_km_curve/`,
-  `data/stage5_results.csv` — Kaplan-Meier curves from the Stage 3v2 CNN's
-  risk score, tertile split, `multivariate_logrank_test` (mentor's exact
-  convention). `lungs` validated: logrank p=0.037. The other 6 organs
-  (including `anterior_mediastinum`) are pending the user running
-  `sbatch src/submit_stage5_km.sh`.
-- **Stage 6** ✅ `src/stage6_saliency.py`, `data/saliency/`,
-  `figs/stage6_saliency/`, `data/stage6_saliency_manifest.csv` — Grad-CAM
-  saliency maps (which voxels drove each prediction) for `lungs` and
-  `anterior_mediastinum`, 20 patients (5 high-risk + 5 low-risk each).
-  Full-CT-space `.nii.gz` per patient (aligned with the source scan's own
-  affine) + PNG overlays + per-organ overview montages. Took 2 job
-  submissions to land (first got stuck behind `gpu-l40s`'s single, fully-
-  occupied node; second hit its own time limit mid-run) — see `PROGRESS.md`
-  for the full troubleshooting history. `anterior_mediastinum`'s CAMs
-  consistently localize to the mediastinal ROI with a clean-looking
-  high/low risk split, though its Stage 4 AUC CI still barely excludes
-  chance, so this is a promising pattern, not a confirmed result.
+**Verdict:** feasible and methodologically sound as an exploratory study.
+Compute is cheap (CPU-only extraction). Test-set power is far better than the
+CNN work (about 160 test events vs 18, so roughly 50 per KM tertile vs 6). The
+main scientific risk is confounding (kernel, age, smoking), which the plan
+addresses explicitly rather than hoping away.
 
-## New project folder (this one)
+## Decisions (confirmed with user, 2026-09-26)
 
-```
-student_pipeline/
-├── PLAN.md                 (this file)
-├── env/                    (env setup notes/lockfile — fresh env, see below)
-├── data/
-│   ├── pid_lists/           subset_v1.csv + README.md  [done]
-│   └── organ_crops/         per-organ cropped volumes, populated in Stage 2
-├── src/                    (data loading, CNN model, training loop, KM code)
-├── notebooks/              (stage-by-stage exploration/visualization)
-└── figs/                   (QC + result plots, one subfolder per stage)
-```
+- **Outcome:** lung-cancer incidence from `experiments/lcrisk_discovery/data/manifest.csv`
+  (`time` = days, `event`), same as the CNN pipeline. No mortality outcome
+  (not in our IDC-780 package).
+- **Cohort:** `discovery_pipeline/enriched_cohort_pids.txt` ∩ manifest =
+  **6,373 patients, 1,061 events**. The mentor's `split` column is reused as-is.
+- **Models:** DeepSurv (MLP + Cox partial-likelihood loss, plain torch) as the
+  neural network, benchmarked against clinical-only Cox, Cox elastic-net and a
+  Random Survival Forest.
+- Old CNN-pipeline PLAN/PROGRESS were committed (`eb3b89b`), then removed.
+  `src/stage*` CNN code stays in the repo untouched. `src/organs.py` is reused.
 
-Read-only with respect to `derived/` and `discovery_pipeline/` — this project
-never writes back into either.
+## Blockers / open items
 
-Environment: create a fresh, modern env (e.g. `python 3.11`, `torch`,
-`nibabel`, `numpy`, `pandas`, `lifelines`, `scikit-survival`, `matplotlib`,
-`scikit-learn`) rather than reusing any of the three existing envs in the
-repo — they're each pinned/tuned for their own frozen tooling and mutually
-incompatible (`totalseg` env: py3.10 unpinned; 3DINO env: py3.9;
-`open_thymus_segmentator` env: py3.8, `torch==1.12.0`).
+- **Clinical covariates are not readable by us.** `meta/nlst_780/nlst_780_prsn_idc_20210527.csv`
+  (age, sex, race, cigsmok) is `rw-rw----` owned by `mer:mer`, and we are
+  in group `aura_thymus`, not `mer`. The mentor needs to grant access (e.g.
+  `chgrp aura_thymus` + `chmod g+r`, or put a copy somewhere readable).
+  **Without it, the clinical baseline and confound adjustment are impossible,**
+  and results can't separate heart signal from age. Stages R0–R2 can proceed
+  meanwhile.
+- The cardiac sanity label (`ctab` code 60, "Significant cardiovascular
+  abnormality") sits in `nlst_780_ctab_idc_20210527.csv`, which has the same
+  permission problem.
+- Checked alternatives (2026-09-26), and none carries clinical covariates:
+  `nlst.csv` has `PatientAge`/`PatientSex` 100% empty. The second copy at
+  `discovery_pipeline/nlst_root/meta/nlst_780/` is also owner-only.
+  `derived/` contains only images, masks and embeddings.
 
-## Staged pipeline
+## Staged pipeline (status: nothing built yet)
 
-**Stage 0 — Subset selection & audit.** ✅ Done — see `data/pid_lists/`.
+**R0 — Cohort build.** ⬜ Enriched pids ∩ manifest. For each pid, check that
+`derived/ct_1x1x2mm/{pid}_yr0.nii.gz` and `derived/totalseg_fullres/{pid}_yr0/seg.nii.gz`
+exist (lookup by name only, never enumerate). Join kernel/kVp from the
+manifest, and manufacturer/model plus acquisition parameters parsed from
+`nlst.csv` `SeriesDescription` (kernel, kVp, mA, slice thickness), for R3
+harmonization; join clinical data once
+accessible. Output `data/pid_lists/heart_cohort_v1.csv` plus an attrition
+table (how many dropped, how many events lost, per split).
 
-**Stage 1 — Visualize raw data (3–5 patients from the subset).**
-Load raw CT (`derived/ct_1x1x2mm/{pid}_yr0.nii.gz`) and its segmentation with
-`nibabel`; plot HU histograms and axial/coronal/sagittal grayscale slices
-using the mentor's HU-windowing convention from `code/render_saliency_overlays.py`
-(soft-tissue WL40/WW400 → display range [-160,240]; lung WL-600/WW1500 →
-[-1350,150]). Pure sanity check on orientation/spacing/HU range before any
-modeling. Output: `figs/stage1_raw_ct/*.png`.
+**R1 — Visual QC.** ⬜ Heart mask (TotalSegmentator label 51) overlaid on CT
+for about 10 patients spanning different kernels/manufacturers. Plot the
+in-mask HU histogram. Look specifically at the lung/fat border (partial volume)
+and whether coronary calcium falls inside or just outside the mask.
+Output: `figs/r1_heart_qc/`.
 
-**Stage 2 — Per-organ masking + visualization.**
-Pick ~5–10 organ labels from the TotalSegmentator label set already resolved
-in `code/extract_organ_embeddings.py` (e.g. thymus/anterior-mediastinum via
-the sternum-anchored region logic in `code/prevascular_roi.py`, plus heart,
-lungs, liver, aorta — a mix of "expected relevant" and "control" organs). For
-each, bbox-crop and zero outside the mask (same corrected approach as
-`extract_organ_embeddings.py`'s `_mask_only_crop`, not the leaky bbox-only
-variant), resize to a fixed input size. Adapt `code/prevascular_roi.py`'s
-`qc_figure` panel style (axial/coronal/sagittal + mask contour overlay) for QC
-on a handful of cases per organ first, then run over the full subset. Output:
-per-organ cropped volumes cached to `data/organ_crops/{organ}/{pid}.npy` +
-`figs/stage2_masks/{organ}/*.png`.
+**R2 — Radiomics extraction (Slurm array, CPU `short`).** ⬜
+`src/r2_extract_radiomics.py` + `src/submit_r2_radiomics.sh`.
+- pyradiomics 3.1.0 (has a wheel for our py3.9 venv). Image
+  `ct_1x1x2mm`, mask = seg==51. Resample to 2×2×2 mm isotropic (B-spline
+  image, nearest-neighbour mask; IBSI-recommended for 3D texture). Fixed
+  bin width 25 HU, mask eroded by 1 voxel to limit lung/fat partial volume.
+- Feature classes: `original` only (shape 14, first-order 18, GLCM 24,
+  GLRLM 16, GLSZM 16, GLDM 14, NGTDM 5 ≈ 107). No wavelet/LoG filters: those
+  would add about 1,000 features, which is too many for 1,061 events.
+- **Hand-crafted cardiac features** (the most likely carriers of signal):
+  heart volume; **calcium burden proxy** (volume and density-weighted
+  sum of voxels ≥130 HU within the heart mask dilated 3 mm, excluding
+  bone/aorta labels; explicitly *not* a clinical Agatston score on 2 mm
+  resampled low-dose CT); **pericardial fat volume and mean HU** (−190…−30 HU
+  in a 0–10 mm shell around the heart, excluding lung).
+- Per-patient output: one row. Merged to `data/radiomics/heart_features_v1.csv`.
+  Failures are logged, not silently dropped.
 
-**Stage 3 — Simple CNN classifier, trained per organ.**
-Model: a small 3D CNN (3–4 conv blocks + pooling + FC, binary lung-cancer
-event classifier) per organ, or a 2D-slice CNN on the crop's central/peak
-axial slice as a faster warm-up before the 3D version. Deliberately simple
-and supervised end-to-end — no frozen foundation model — so training curves,
-confusion matrices, and Grad-CAM-style saliency overlays (reusing the
-heatmap-over-CT convention from `code/render_saliency_overlays.py`) are all
-directly interpretable. Train/val/test split reuses the `split` column
-already in `subset_v1.csv`/`manifest.csv`. Loop this over all ~5–10 chosen
-organs using the same subset and same CNN architecture. Output: one model +
-metrics per organ in `src/`, training curves and Grad-CAM montages in
-`figs/stage3_cnn/{organ}/*.png`.
+**R3 — Feature QC, harmonization, univariate association.** ⬜
+- Drop features that are constant, missing or near-zero-variance. Cluster
+  features with |Spearman| > 0.95 and keep one representative each.
+- **Kernel-leakage probe:** how well do the features predict kernel group
+  (soft/standard vs sharp)? A high AUC means ComBat harmonization by kernel
+  group (fit on training folds only) or restriction to the robust subset
+  (shape + first-order + cardiac).
+- **Univariate Cox per feature** (HR per SD, 95% CI), unadjusted and adjusted
+  for age/sex/smoking, with BH-FDR. Volcano/forest plot. This is the most
+  interpretable answer to "is there *any* relation."
 
-**Stage 4 — Organ ranking.**
-Compare the per-organ CNNs from Stage 3 by held-out AUC (with k-fold CV if
-the subset supports it) — a simple, interpretable proxy for "which organ
-carries lung-cancer signal." Output: a bar chart of per-organ AUC with CI
-(`figs/stage4_ranking.png`) plus the top organ(s)' saliency montage.
+**R4 — Models (train+val via 5-fold CV for tuning; test held out once).** ⬜
+1. Clinical-only Cox (age, sex, smoking status): the bar to beat.
+2. Cox elastic-net on radiomics; the same with clinical covariates added.
+3. Random Survival Forest (scikit-survival).
+4. **DeepSurv**: MLP (e.g. 2 × 32–64 hidden units, dropout, weight decay),
+   Cox partial-likelihood loss, early stopping on validation C-index, and
+   standardization fit on the training fold. Run on radiomics alone and on
+   radiomics + clinical.
+5. Null control: DeepSurv on permuted survival labels, which should give a
+   C-index of about 0.5.
 
-**Stage 5 — Kaplan-Meier curve.**
-Take the best-ranked organ's (or top-2/3 pooled) CNN output probability as a
-continuous risk score. Split into tertiles with `pd.qcut` on a tie-safe rank
-(exactly as `discovery_pipeline/src/km_analysis.py` does), fit
-`lifelines.KaplanMeierFitter` per tertile, run `multivariate_logrank_test` for
-a trend p-value. If the subset doesn't have enough events per tertile for a
-legible curve, extend it (more negatives/positives from the same sampling
-frame, see `data/pid_lists/README.md`) rather than changing method. Output:
-`figs/stage5_km_curve.png` with risk table, matching the mentor's plotting
-style.
+**R5 — Evaluation on held-out test (2,080 patients, 160 events).** ⬜
+- Harrell's and Uno's C-index with bootstrap 95% CI. **ΔC vs the clinical
+  model** (paired bootstrap): the key incremental-value number.
+- Time-dependent AUC at 2/4/6 years. HR per SD of each model's risk score
+  (unadjusted and clinical-adjusted).
+- **Kaplan–Meier** risk-score tertiles plus a multivariate log-rank trend
+  test (same convention as `discovery_pipeline/src/km_analysis.py`), with
+  number-at-risk tables.
+- Brier / calibration are reported **only with the enrichment caveat**.
+- Interpretability: permutation importance (and SHAP for DeepSurv). KM curves
+  for the top 1–2 individual features (e.g. calcium proxy tertiles).
+- Robustness: results stratified by kernel group / manufacturer.
 
-**Stage 6 — Grad-CAM saliency maps.**
-For `lungs` and `anterior_mediastinum` only (the validated positive control
-and the actual scientific target), compute Grad-CAM (Selvaraju et al. 2017)
-on the Stage 3v2 CNN's last conv layer (`Simple3DCNN.features[12]`) for the
-5 highest- and 5 lowest-risk test-set patients per organ. The cached crop's
-bounding-box offset isn't stored anywhere, so it's recomputed from the
-original CT+seg for each selected patient (and checked against the cached
-crop's shape) to reproject the CAM into full-CT space. Output:
-`data/saliency/{organ}/{pid}_gradcam.nii.gz` (aligned with the source CT's
-affine — loads correctly in any NIfTI viewer next to the original scan),
-`figs/stage6_saliency/{organ}/{pid}_montage.png` (CT + overlay), and
-`figs/stage6_saliency/{organ}_overview.png` (high-risk vs low-risk grid).
-Organs whose Stage 4 AUC CI spans chance are captioned as such, not
-presented at face value.
+**R6 — Controls on the same pipeline (recommended, cheap).** ⬜ Rerun R2–R5
+with `lungs` (positive control: lung-cancer signal is expected) and `sternum`
+(negative control). If lungs radiomics clear the clinical baseline and
+sternum doesn't, the pipeline is validated and a heart null result means
+something.
 
-**Stage 7 (stretch, optional) — Benchmark against the mentor's approach.**
-Reuse precomputed `derived/dino_organ_emb/{pid}_yr0.npz` embeddings for the
-same student subset + a plain CoxNet (no deconfounding) to see how far the
-simple CNN approach falls short of the full discovery pipeline — a graduation
-point, not a required step.
+**R7 (optional).** ⬜ Cardiac sanity check: do heart features predict the
+radiologist's "significant cardiovascular abnormality" flag (ctab code 60)?
+This confirms the features encode cardiac information even if lung-cancer
+signal is null. It depends on ctab access.
 
-## Critical files to reuse / reference (read-only)
+## Environment additions
 
-- `discovery_pipeline/src/data.py` — pid/stem convention (`{pid}_yr0`), cohort
-  join pattern (manifest ↔ prsn clinical ↔ scanner), label allowlist logic.
-- `discovery_pipeline/src/km_analysis.py`, `km_per_organ.py` — canonical
-  `lifelines` KM pattern (qcut → KaplanMeierFitter → logrank test).
-- `code/prevascular_roi.py` — sternum/lung/heart-anchored ROI logic and its
-  `qc_figure` visualization panel.
-- `code/extract_organ_embeddings.py` — TotalSegmentator label→name map,
-  corrected mask-and-zero crop approach (`_mask_only_crop`), HU normalization.
-- `code/render_saliency_overlays.py` — HU display windows, heatmap-over-CT
-  montage style.
-- `experiments/lcrisk_discovery/data/manifest.csv` — reuse `time`/`event`
-  columns as-is; don't re-derive the outcome.
-- `discovery_pipeline/enriched_cohort_pids.txt` — sampling frame for Stage 0.
+`env/.venv/bin/pip install pyradiomics==3.1.0 SimpleITK scikit-survival neuroCombat shap`
+(the venv is actually **Python 3.9.25**, not 3.11 as CLAUDE.md states).
 
-## Verification (once implementation starts)
+## Reporting norms (carried over)
 
-- Stage 1–2: manual visual review of QC montages for the first 3–5 patients
-  per organ (correct orientation, mask actually covers the intended organ).
-- Stage 3: per-organ train/val loss curves should converge without
-  diverging; sanity-check a few Grad-CAM overlays land inside the organ mask,
-  not on background.
-- Stage 4: ranking bar chart should show separation with visible confidence
-  intervals, not all organs at chance-level AUC (if so, revisit subset size
-  or organ choice before proceeding).
-- Stage 5: KM curves should show visually separated tertile survival curves
-  with a `multivariate_logrank_test` p-value reported (not necessarily
-  significant given the small subset — report honestly either way).
-- Stage 6: recomputed bbox shape must exactly match the cached crop's own
-  shape for every processed patient (hard assertion in the script, not just
-  a visual check); load one output `.nii.gz` next to its source CT and
-  confirm shape/affine match; visually confirm `lungs`' high-risk CAMs land
-  on plausible parenchymal regions rather than scan borders/margins.
+Weak/null results are reported plainly. Any metric whose CI spans chance is
+flagged "interpret with caution". Event counts per split/tertile are stated
+wherever risk scores or KM curves appear. Multiple-comparisons (FDR) and
+enrichment caveats are always attached.
