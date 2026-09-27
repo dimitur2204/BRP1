@@ -96,6 +96,12 @@ hypotheses:
     priority: medium
     parent: null
 
+  - id: H12
+    statement: "TH x histology heterogeneity (SQ/SC protective, adeno null) is robust to dose-marker adjustment (SQ/SC HR <=0.90, p<0.05, ratio <=0.87), consistent across splits/subgroups, and not shared by fat/heart-volume comparators"
+    status: pending
+    priority: high
+    parent: H1
+
 experiments:
   proxy_metric: "Held-out test Harrell's C (n=2,040-ish, ~150 events) of Cox models fit on train+val; primary association metric = adjusted HR per SD on the full cohort (stratified by split)"
   baseline_value: 0.657          # clinical Cox on TH-complete test (R5 full test: 0.647)
