@@ -1,0 +1,281 @@
+<title>Thymus × Calcium in NLST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+  :root {
+    --paper: #f5f7f7;
+    --surface: #ffffff;
+    --fig: #fcfcfb;
+    --ink: #15191c;
+    --ink-2: #4c555b;
+    --ink-3: #7b858b;
+    --rule: #dde2e4;
+    --th: #2a78d6;
+    --ca: #eb6834;
+    --ok-bg: #e3f2ea; --ok-ink: #17603c;
+    --no-bg: #f9e4e1; --no-ink: #9b2e22;
+    --mid-bg: #f7eed8; --mid-ink: #7a5500;
+    --rev-bg: #e5ecf5; --rev-ink: #2c4c73;
+    --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    --cond: "IBM Plex Sans Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #111416; --surface: #181c1f; --fig: #fcfcfb;
+      --ink: #e8ecee; --ink-2: #a9b3b9; --ink-3: #7f8a90; --rule: #2b3236;
+      --th: #3987e5; --ca: #d95926;
+      --ok-bg: #16392a; --ok-ink: #8fd9b0;
+      --no-bg: #43201c; --no-ink: #f0a79c;
+      --mid-bg: #3d3113; --mid-ink: #e8c46f;
+      --rev-bg: #1d2c40; --rev-ink: #a9c6ec;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #111416; --surface: #181c1f; --fig: #fcfcfb;
+    --ink: #e8ecee; --ink-2: #a9b3b9; --ink-3: #7f8a90; --rule: #2b3236;
+    --th: #3987e5; --ca: #d95926;
+    --ok-bg: #16392a; --ok-ink: #8fd9b0;
+    --no-bg: #43201c; --no-ink: #f0a79c;
+    --mid-bg: #3d3113; --mid-ink: #e8c46f;
+    --rev-bg: #1d2c40; --rev-ink: #a9c6ec;
+  }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font: 16px/1.6 var(--sans);
+    padding-inline: 20px;
+    padding-block: 40px 64px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 56px; }
+  .prose { max-width: 68ch; }
+  h1, h2, h3 { font-family: var(--cond); text-wrap: balance; margin: 0; line-height: 1.15; }
+  h1 { font-size: clamp(2rem, 5vw, 2.9rem); font-weight: 600; letter-spacing: -0.01em; }
+  h2 { font-size: 1.55rem; font-weight: 600; }
+  h3 { font-size: 1.1rem; font-weight: 600; }
+  p { margin: 0; }
+  .stack { display: grid; gap: 16px; }
+  .eyebrow {
+    font: 500 0.74rem/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3);
+  }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 0.8rem/1.4 var(--mono); color: var(--ink-2); }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 0.92em; white-space: nowrap; }
+  .th { color: var(--th); font-weight: 600; }
+  .ca { color: var(--ca); font-weight: 600; }
+  .answer {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 6px;
+    padding: 24px; display: grid; gap: 18px;
+  }
+  .answer ol { margin: 0; padding-left: 1.3em; display: grid; gap: 12px; }
+  .answer li::marker { font-family: var(--mono); color: var(--ink-3); }
+  figure { margin: 0; display: grid; gap: 10px; }
+  figure .frame { background: var(--fig); border: 1px solid var(--rule); border-radius: 6px; padding: 8px; overflow-x: auto; }
+  figure img { display: block; width: 100%; height: auto; }
+  figcaption { font-size: 0.86rem; color: var(--ink-2); max-width: 80ch; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font: 500 0.72rem/1.3 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+  tr:last-child td { border-bottom: 0; }
+  td.id { font-family: var(--mono); color: var(--ink-2); white-space: nowrap; }
+  .chip { display: inline-block; font: 500 0.72rem/1.2 var(--mono); padding: 3px 8px; border-radius: 3px; white-space: nowrap; }
+  .ok { background: var(--ok-bg); color: var(--ok-ink); }
+  .no { background: var(--no-bg); color: var(--no-ink); }
+  .mid { background: var(--mid-bg); color: var(--mid-ink); }
+  .rev { background: var(--rev-bg); color: var(--rev-ink); }
+  .two { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+  .note {
+    border-left: 3px solid var(--rule); padding-left: 14px; color: var(--ink-2); font-size: 0.92rem;
+  }
+  .chart { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 16px; overflow-x: auto; }
+  .chart svg { display: block; width: 100%; min-width: 560px; height: auto; }
+  .chart text { font-family: var(--sans); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.82rem; color: var(--ink-2); margin-top: 6px; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+  code { font: 0.86em var(--mono); background: var(--surface); border: 1px solid var(--rule); border-radius: 3px; padding: 1px 5px; }
+  pre { font: 0.82rem/1.5 var(--mono); background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px; overflow-x: auto; margin: 0; }
+  ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 8px; }
+  footer { font: 0.78rem/1.5 var(--mono); color: var(--ink-3); border-top: 1px solid var(--rule); padding-top: 16px; }
+  a { color: var(--th); }
+  a:focus-visible { outline: 2px solid var(--th); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+
+  <header class="stack">
+    <p class="eyebrow">Research progress 001 · branch thymus-heart-aging · 27 Sep 2026</p>
+    <h1>Thymus × Calcium in NLST</h1>
+    <p class="prose" style="font-size:1.1rem;color:var(--ink-2)">Two aging axes read off the same baseline low-dose CT: immune aging (the published thymic-health score of Bernatz et al., <i>Nature</i> 2026) and vascular aging (our cardiac calcium burden). Do they predict lung cancer independently, or are both stand-ins for smoking?</p>
+    <div class="meta">
+      <span>NLST T0 screens</span><span>case-cohort 6,041 pts / 1,003 cancers</span><span>full CT arm 25,031 pts / 1,030 cancers</span><span>5 experiments · 14 hypotheses</span>
+    </div>
+  </header>
+
+  <section class="answer" aria-labelledby="bl">
+    <h2 id="bl">Bottom line</h2>
+    <ol>
+      <li><span class="ca">Cardiac calcium</span> is a general, independent lung-cancer risk marker: HR <span class="num">1.14</span> per SD <span class="num">[1.08, 1.22]</span> after age, sex and smoking. It is unmoved by thymic health or the radiologist's emphysema read, stable across follow-up, and threshold-like. It adds a small but reproducible <span class="num">+0.01</span> test C-index to every baseline we tried.</li>
+      <li>The <span class="th">thymic-health score</span> reproduces the paper exactly (unadjusted high vs low HR <span class="num">0.649</span> vs published <span class="num">0.64</span>). After adjustment it protects <b>only against non-adenocarcinoma</b>: squamous + small cell HR <span class="num">0.83</span> per SD, adenocarcinoma <span class="num">1.00</span>, interaction <span class="num">p = 0.019</span>.</li>
+      <li>The two axes are linked but complementary. Lower thymic health goes with more calcium (partial ρ <span class="num">−0.10</span>) and much more pericardial fat (<span class="num">−0.32</span>). They share about a quarter of the squamous/small-cell signal.</li>
+    </ol>
+  </section>
+
+  <section class="stack" aria-labelledby="f1">
+    <p class="eyebrow">Finding 1 · E5, full NLST CT arm</p>
+    <h2 id="f1">Thymic health protects against squamous and small-cell cancer, not adenocarcinoma</h2>
+    <figure>
+      <div class="frame"><img src="figs/th_histology_cif.png" alt="Cumulative incidence by thymic-health category: three overlapping curves for adenocarcinoma; clearly separated curves for squamous plus small cell, with low thymic health highest."></div>
+      <figcaption>Aalen–Johansen cumulative incidence by published thymic-health category. Other lung cancers are the competing event. Adenocarcinoma is 474 events, squamous + small cell 362 (ICD-O-3 8070–8084, 8041–8045). HRs per SD are cause-specific Cox, adjusted for age, sex and smoking status.</figcaption>
+    </figure>
+    <div class="prose stack">
+      <p>Pooled over histologies, thymic health's adjusted HR is <span class="num">0.91</span> per SD (<span class="num">p = 0.004</span>). Split by histology, that average hides a clean dichotomy: squamous <span class="num">0.80</span>, small cell <span class="num">0.89</span>, other/NOS <span class="num">0.86</span>, adenocarcinoma <span class="num">1.00 [0.91, 1.10]</span>. The Lunn–McNeil competing-risks interaction is <span class="num">0.835 [0.72, 0.97]</span>. It is unchanged by adjusting for emphysema.</p>
+      <p>We stress-tested it before believing it (E4, locked protocol). The direction holds in all 7 disjoint subsets (train/val/test, men/women, current/former smokers). Body-size comparators (pericardial fat, heart volume) don't show it. It isn't driven by indolent BAC-type adenocarcinomas, and it is stronger for stage III–IV (<span class="num">0.91</span>) than stage I–II (<span class="num">0.98</span>) cancers.</p>
+      <p class="note">Candidate mechanism: thymic output (the naïve T-cell repertoire) matters most for the most mutagenized, neoantigen-rich tumours, the smoking-signature histologies. That would also explain why the paper's lung-cancer <i>mortality</i> HR (0.52) is stronger than its incidence HR (0.64). The alternative is residual pack-years confounding. It predicts that smoking-dose markers would absorb most of the effect, but they absorb about 25%. Deciding between the two needs pack-years from CDAS. The finding came from an exploratory comparison (p = 0.009 against a Bonferroni threshold of 0.01), and every later check used the same cancers. It is robust, but it has not been independently replicated.</p>
+    </div>
+  </section>
+
+  <section class="stack" aria-labelledby="f2">
+    <p class="eyebrow">Finding 2 · E1–E3, case-cohort with imaging features</p>
+    <h2 id="f2">Cardiac calcium is a general risk marker, orthogonal to emphysema</h2>
+    <div class="two">
+      <figure>
+        <div class="frame"><img src="figs/histology_hazards.png" alt="Histology-specific hazard ratios: current smoking much stronger for squamous plus small cell; calcium similar in both; thymic health protective only for squamous plus small cell."></div>
+        <figcaption>The histology test used as an indirect smoking-dose probe. Current smoking (the method control) is 1.74× stronger for squamous/small cell. Calcium is only 1.08×, so it doesn't behave like a pure dose marker.</figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><img src="figs/dose_response.png" alt="Dose-response: no calcium as reference, low and mid tertiles near 1, high tertile HR 1.36."></div>
+        <figcaption>Dose-response is threshold-like. Only the top third of non-zero calcium (mass proxy &gt; 11 HU·mL) carries risk: HR 1.36 [1.09, 1.70] vs none, trend p = 0.001.</figcaption>
+      </figure>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Check on calcium (HR per SD)</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>Adjusted for age, sex, smoking</td><td class="num">1.14 [1.08, 1.22]</td></tr>
+          <tr><td>+ thymic health</td><td class="num">1.14 (3% attenuation)</td></tr>
+          <tr><td>+ radiologist emphysema read (ctab code 59)</td><td class="num">1.14 (1.5% [−6, +10]%)</td></tr>
+          <tr><td>Age as spline / sex × age strata</td><td class="num">1.145 / 1.144</td></tr>
+          <tr><td>+ scanner batch + measured noise</td><td class="num">1.17</td></tr>
+          <tr><td>Year 0–1 vs landmark after year 1</td><td class="num">1.15 vs 1.14</td></tr>
+          <tr><td>Association with emphysema itself</td><td class="num">OR 0.99 (none)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="stack" aria-labelledby="f3">
+    <p class="eyebrow">Finding 3 · held-out test split, n = 1,983, 149 cancers</p>
+    <h2 id="f3">Prediction: calcium adds, thymic health doesn't (pooled)</h2>
+    <div class="chart" role="img" aria-label="Test C-index by model with 95% bootstrap intervals">
+      <svg viewBox="0 0 740 330" xmlns="http://www.w3.org/2000/svg">
+        <g font-size="12" fill="var(--ink-2)">
+          <!-- x scale: 0.60 -> 230, 0.74 -> 690 ; px per 0.01 = 32.857 -->
+          <line x1="230" y1="20" x2="230" y2="290" stroke="var(--rule)"/>
+          <line x1="295.7" y1="20" x2="295.7" y2="290" stroke="var(--rule)"/>
+          <line x1="361.4" y1="20" x2="361.4" y2="290" stroke="var(--rule)"/>
+          <line x1="427.1" y1="20" x2="427.1" y2="290" stroke="var(--rule)"/>
+          <line x1="492.9" y1="20" x2="492.9" y2="290" stroke="var(--rule)"/>
+          <line x1="558.6" y1="20" x2="558.6" y2="290" stroke="var(--rule)"/>
+          <line x1="624.3" y1="20" x2="624.3" y2="290" stroke="var(--rule)"/>
+          <line x1="690" y1="20" x2="690" y2="290" stroke="var(--rule)"/>
+          <text x="230" y="310" text-anchor="middle">0.60</text>
+          <text x="295.7" y="310" text-anchor="middle">0.62</text>
+          <text x="361.4" y="310" text-anchor="middle">0.64</text>
+          <text x="427.1" y="310" text-anchor="middle">0.66</text>
+          <text x="492.9" y="310" text-anchor="middle">0.68</text>
+          <text x="558.6" y="310" text-anchor="middle">0.70</text>
+          <text x="624.3" y="310" text-anchor="middle">0.72</text>
+          <text x="690" y="310" text-anchor="middle">0.74</text>
+          <text x="460" y="326" text-anchor="middle" font-size="11" fill="var(--ink-3)">Harrell's C on held-out test (95% bootstrap CI, 1,000 resamples)</text>
+        </g>
+        <g font-size="13" fill="var(--ink)">
+          <text x="0" y="44">clinical (age, sex, smoking)</text>
+          <text x="0" y="82">+ thymic health</text>
+          <text x="0" y="120">+ calcium</text>
+          <text x="0" y="158">+ thymic health + calcium</text>
+          <text x="0" y="196">+ emphysema read</text>
+          <text x="0" y="234">+ emphysema + calcium</text>
+          <text x="0" y="272">+ emphysema + TH + calcium</text>
+        </g>
+        <g stroke-width="2.5" stroke-linecap="round">
+          <line x1="272.1" y1="40" x2="557.3" y2="40" stroke="var(--ink-3)"/>
+          <line x1="276.9" y1="78" x2="560.5" y2="78" stroke="var(--th)"/>
+          <line x1="306.7" y1="116" x2="580.1" y2="116" stroke="var(--ca)"/>
+          <line x1="300.0" y1="154" x2="574.2" y2="154" stroke="var(--ca)"/>
+          <line x1="349.7" y1="192" x2="617.5" y2="192" stroke="var(--ink-3)"/>
+          <line x1="385.3" y1="230" x2="647.0" y2="230" stroke="var(--ca)"/>
+          <line x1="371.7" y1="268" x2="636.9" y2="268" stroke="var(--ca)"/>
+        </g>
+        <g stroke="var(--surface)" stroke-width="2">
+          <circle cx="417.7" cy="40" r="6" fill="var(--ink-3)"><title>clinical: C 0.657 [0.613, 0.700]</title></circle>
+          <circle cx="421.7" cy="78" r="6" fill="var(--th)"><title>+ thymic health: C 0.658, ΔC +0.001</title></circle>
+          <circle cx="449.3" cy="116" r="6" fill="var(--ca)"><title>+ calcium: C 0.667, ΔC +0.010 [−0.002, +0.022]</title></circle>
+          <circle cx="443.6" cy="154" r="6" fill="var(--ca)"><title>+ TH + calcium: C 0.665, ΔC +0.008</title></circle>
+          <circle cx="485.8" cy="192" r="6" fill="var(--ink-3)"><title>+ emphysema: C 0.678, ΔC +0.021</title></circle>
+          <circle cx="518.7" cy="230" r="7" fill="var(--ca)"><title>+ emphysema + calcium: C 0.688, ΔC +0.031 [+0.005, +0.060]; +0.010 over emphysema</title></circle>
+          <circle cx="507.9" cy="268" r="6" fill="var(--ca)"><title>+ emphysema + TH + calcium: C 0.685</title></circle>
+        </g>
+        <g font-size="11.5" fill="var(--ink-2)" font-family="IBM Plex Mono, monospace">
+          <text x="738" y="44" text-anchor="end">0.657</text>
+          <text x="738" y="82" text-anchor="end">0.658</text>
+          <text x="738" y="120" text-anchor="end">0.667</text>
+          <text x="738" y="158" text-anchor="end">0.665</text>
+          <text x="738" y="196" text-anchor="end">0.678</text>
+          <text x="738" y="234" text-anchor="end" font-weight="500" fill="var(--ink)">0.688</text>
+          <text x="738" y="272" text-anchor="end">0.685</text>
+        </g>
+      </svg>
+      <div class="legend">
+        <span style="--c:var(--ink-3)">no imaging marker</span>
+        <span style="--c:var(--th)">thymic health</span>
+        <span style="--c:var(--ca)">includes calcium</span>
+      </div>
+    </div>
+    <p class="prose">Calcium gives <span class="num">+0.010</span> over clinical and <span class="num">+0.010 [+0.000, +0.020]</span> over clinical + emphysema. The same gain appeared in the earlier R5 run. Pooled thymic health adds nothing, but for <b>squamous/small-cell-specific</b> prediction it adds <span class="num">+0.013</span> (C 0.720 → 0.733, <span class="num">p = 0.056</span>, 58 events), while for adenocarcinoma it subtracts <span class="num">0.016</span>. That's the same dichotomy as Finding 1, seen on held-out patients. The cohort is case-enriched, so rankings are valid but absolute risks are not.</p>
+  </section>
+
+  <section class="stack" aria-labelledby="ledger">
+    <h2 id="ledger">Hypothesis ledger</h2>
+    <p class="prose" style="color:var(--ink-2)">Each protocol was committed to git before its analysis ran. Predictions are the locked ones.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>ID</th><th>Locked prediction</th><th>Outcome</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td class="id">H1</td><td>TH high vs low adj HR 0.5–0.85 (case-cohort)</td><td class="num">0.90, n.s. → full arm 0.81 [0.67, 0.97]</td><td><span class="chip rev">revised</span></td></tr>
+          <tr><td class="id">H2</td><td>Lower TH ↔ more calcium and pericardial fat</td><td class="num">ρ −0.10 / −0.32</td><td><span class="chip ok">supported</span></td></tr>
+          <tr><td class="id">H3</td><td>TH and calcium both significant jointly</td><td>calcium yes, TH no (case-cohort)</td><td><span class="chip no">refuted</span></td></tr>
+          <tr><td class="id">H4</td><td>TH + calcium beats clinical on test</td><td class="num">ΔC +0.008, CI spans 0</td><td><span class="chip no">refuted</span></td></tr>
+          <tr><td class="id">H5</td><td>Emphysema absorbs ≥25% of calcium (proxy) vs &lt;10%</td><td class="num">1.5%</td><td><span class="chip ok">independent</span></td></tr>
+          <tr><td class="id">H6</td><td>Calcium AUC ≥0.75 for radiologist CV flag (ctab 60)</td><td class="num">AUC 0.62, OR 1.40; TH OR 0.85</td><td><span class="chip mid">partial</span></td></tr>
+          <tr><td class="id">H7</td><td>Calcium ≥10% stronger for squamous/small cell</td><td class="num">1.08 [0.94, 1.25]</td><td><span class="chip mid">inconclusive</span></td></tr>
+          <tr><td class="id">H8</td><td>Calcium effect persists after year 1</td><td class="num">1.14 [1.06, 1.23]</td><td><span class="chip ok">supported</span></td></tr>
+          <tr><td class="id">H9</td><td>Monotone dose-response, top vs none &gt;1.3</td><td class="num">1.36, trend p 0.001</td><td><span class="chip ok">supported</span></td></tr>
+          <tr><td class="id">H10</td><td>Calcium robust to age spline, scanner</td><td class="num">1.14–1.17</td><td><span class="chip ok">supported</span></td></tr>
+          <tr><td class="id">H11</td><td>TH is scanner-robust</td><td class="num">kernel AUC 0.52, R² 1.8%</td><td><span class="chip ok">supported</span></td></tr>
+          <tr><td class="id">H12</td><td>TH × histology survives stress tests</td><td class="num">LM p 0.010; 7/7 subsets; 25% shared</td><td><span class="chip ok">mostly</span></td></tr>
+          <tr><td class="id">H13</td><td>Our TH join reproduces the paper</td><td class="num">0.649 vs 0.64</td><td><span class="chip ok">supported</span></td></tr>
+          <tr><td class="id">H14</td><td>TH × histology holds on full CT arm</td><td class="num">interaction 0.835, p 0.019</td><td><span class="chip ok">supported</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">A lesson from H1 → H13: the mentor's enriched sample (all cases, about 5k controls, per-split sampling) diluted thymic health to 0.95 per SD. The full CT arm, with the same cancers and 24k controls, gives 0.91. Calcium currently exists only on the enriched sample, which is the main reason to run the extraction below.</p>
+  </section>
+
+  <section class="stack" aria-labelledby="next">
+    <h2 id="next">Next, and what I need from you</h2>
+    <ul class="plain prose">
+      <li><b>Full-CT-arm calcium extraction (big sbatch, you run it).</b> About 19k more baseline scans. It would put calcium and thymic health in one unsampled model, and remove the case-cohort caveat from Finding 2. I'll prepare the script and cohort file on this branch.</li>
+      <li><b>Pack-years via CDAS</b> (<code>docs/future_data_request_cdas.md</code>). This is the single dataset that decides immune surveillance vs residual smoking dose for Finding 1.</li>
+      <li><b>Optional R6 controls</b> (lung positive / sternum negative radiomics) to validate the extraction pipeline itself.</li>
+      <li>Then the write-up: <code>findings.md</code> already reads as a paper backbone. 28 verified references are in <code>literature/</code>.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Branch thymus-heart-aging · protocols locked before results (git: 2b68f4f, 88cbd65, 8f9b1a7, 9a3a50f) · code in experiments/E1–E5 · state in research-state.yaml, findings.md
+  </footer>
+</div>
