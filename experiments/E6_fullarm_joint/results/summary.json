@@ -1,0 +1,37 @@
+{
+  "built": 16178,
+  "built_events": 1037,
+  "analysis_n": 15784,
+  "analysis_events": 1003,
+  "by_source": {
+    "size": {
+      "fullarm": 9743,
+      "v1": 6041
+    },
+    "sum": {
+      "fullarm": 0,
+      "v1": 1003
+    }
+  },
+  "partial_rho": {
+    "th_pct~log_calc": -0.09427935217409845,
+    "th_pct~card_fat_volume_ml": -0.33156490536576505,
+    "log_calc~card_fat_volume_ml": -0.0892852459887031
+  },
+  "lunn_mcneil_th_x_sqsc": {
+    "var": "th_x_sq",
+    "coef": -0.1766256820374509,
+    "se": 0.07670851836734872,
+    "hr": 0.8380934392446372,
+    "lo": 0.7211042110304501,
+    "hi": 0.9740625587266805,
+    "p": 0.02130382044375441
+  },
+  "calcium_histology_ratio": {
+    "delta_logHR": 0.08289073061551945,
+    "hr_ratio": 1.0864230892799145,
+    "ratio_lo": 0.9486115394419957,
+    "ratio_hi": 1.2442555038017067,
+    "p": 0.23102848515897556
+  }
+}

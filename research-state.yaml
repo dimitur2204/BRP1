@@ -115,25 +115,25 @@ hypotheses:
 
   - id: H15
     statement: "Calcium HR/SD without case-cohort sampling (TotalSeg-covered CT arm ~16k) in [1.08, 1.25], p<0.001"
-    status: pending   # waits on user sbatch src/submit_r2_fullarm.sh
+    status: supported # 16k: calcium 1.138 [1.071,1.209]; T3 1.33 (E6)
     priority: medium
     parent: null
   - id: H16
     statement: "Joint TH + calcium + emphysema on ~16k: both p<0.05, each attenuates <15%"
-    status: pending   # waits on user sbatch
+    status: partial   # 16k joint: TH 0.934 p=0.042 (atten 29%), calcium 1.126 (atten 8%) (E6)
     priority: medium
     parent: H3
   - id: H17
     statement: "TH x histology survives calcium adjustment on ~16k: LM interaction <1, p<0.05; SQ/SC TH HR <= 0.90"
-    status: pending   # waits on user sbatch
+    status: supported # 16k: LM 0.838 p=0.021; SQ/SC TH adj emph+Ca 0.859 p=0.009 (E6)
     priority: high
     parent: H14
 
 experiments:
   proxy_metric: "Held-out test Harrell's C (n=2,040-ish, ~150 events) of Cox models fit on train+val; primary association metric = adjusted HR per SD on the full cohort (stratified by split)"
   baseline_value: 0.657          # clinical Cox on TH-complete test (R5 full test: 0.647)
-  best_value: 0.688              # clinical + emphysema + calcium (E2)
-  total_runs: 8
+  best_value: 0.692              # clinical + emphysema + calcium + TH, 16k cohort test split (E6)
+  total_runs: 12
   trajectory:   # test Harrell C, TH-complete test split n=1,983 / 149 events
     - {run_id: E1-clin, hypothesis: H4, metric_value: 0.657, delta: 0.000, change_summary: "clinical Cox (age, sex, smoking)"}
     - {run_id: E1-TH, hypothesis: H4, metric_value: 0.658, delta: 0.001, change_summary: "+ thymic health"}
@@ -142,9 +142,14 @@ experiments:
     - {run_id: E2-emph, hypothesis: H5, metric_value: 0.678, delta: 0.021, change_summary: "+ radiologist emphysema read"}
     - {run_id: E2-emph-Ca, hypothesis: H5, metric_value: 0.688, delta: 0.031, change_summary: "+ emphysema + calcium"}
     - {run_id: E2-emph-TH-Ca, hypothesis: H5, metric_value: 0.685, delta: 0.028, change_summary: "+ emphysema + TH + calcium"}
+    # E6: 16k cohort (all cases + ~62% of controls), test n=2,622 / 149 events
+    - {run_id: E6-clin, hypothesis: H15, metric_value: 0.660, delta: 0.000, change_summary: "clinical (16k cohort)"}
+    - {run_id: E6-emph, hypothesis: H15, metric_value: 0.680, delta: 0.020, change_summary: "+ emphysema (16k)"}
+    - {run_id: E6-emph-Ca, hypothesis: H15, metric_value: 0.689, delta: 0.029, change_summary: "+ emphysema + calcium (16k)"}
+    - {run_id: E6-emph-Ca-TH, hypothesis: H16, metric_value: 0.692, delta: 0.032, change_summary: "+ emphysema + calcium + TH (16k)"}
 
 outer_loop:
-  cycle: 3
+  cycle: 4
   last_direction: deepen
   last_reflection: >
     Calcium is robust, independent of TH and emphysema, +0.01 C on every base.
@@ -154,7 +159,6 @@ outer_loop:
     flexible age; TH kernel robustness.
 
 pending_human_actions:
-  - "sbatch src/submit_r2_fullarm.sh (40 tasks x ~9 min, cardiac-only, 9,872 pids), then: env/.venv/bin/python src/r2_extract_radiomics.py --merge --tag fullarm --cohort data/pid_lists/heart_cohort_fullarm.csv ; then run experiments/E6_fullarm_joint/code/run_e6.py"
   - "Optional sbatch (R6 controls: lungs/sternum radiomics) — deferred until needed"
   - "~9k TH-scored CT-arm pids lack TotalSegmentator masks (mentor's GPU job) — only needed to reach the full 25k"
   - "CDAS request for pack-years/mortality (docs/future_data_request_cdas.md)"

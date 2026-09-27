@@ -44,3 +44,7 @@ data/radiomics/*_chunks/
 #   env/.venv/bin/python src/r3_feature_qc.py
 data/radiomics/heart_features_v1.csv
 data/radiomics/heart_features_v1_r3.csv
+# full-CT-arm cardiac-only features (~1.5MB, 9,872 pids) -- regenerate with:
+#   sbatch src/submit_r2_fullarm.sh && env/.venv/bin/python src/r2_extract_radiomics.py \
+#     --merge --tag fullarm --cohort data/pid_lists/heart_cohort_fullarm.csv
+data/radiomics/heart_features_fullarm.csv

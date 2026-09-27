@@ -1,0 +1,5 @@
+SQ/SC TH clinical               0.831 [0.742,0.932] p=0.0015 atten=0.00
+SQ/SC TH +emph                  0.839 [0.749,0.940] p=0.0025 atten=0.05
+SQ/SC TH +emph+calcium          0.859 [0.766,0.963] p=0.0090 atten=0.18
+SQ/SC TH +emph+calcium+fat      0.849 [0.754,0.956] p=0.0069 atten=0.11
+adeno TH clinical 1.006 0.913 1.108
