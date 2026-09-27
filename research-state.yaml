@@ -102,6 +102,17 @@ hypotheses:
     priority: high
     parent: H1
 
+  - id: H13
+    statement: "Our TH pipeline reproduces the paper on the full NLST CT arm: unadjusted 6-yr high vs low HR within [0.53, 0.76]"
+    status: pending
+    priority: medium
+    parent: H1
+  - id: H14
+    statement: "TH x histology heterogeneity holds in the full (unsampled) CT arm: LM interaction < 1, p<0.05; SQ/SC HR/SD < 0.92; adeno CI includes 1"
+    status: pending
+    priority: high
+    parent: H12
+
 experiments:
   proxy_metric: "Held-out test Harrell's C (n=2,040-ish, ~150 events) of Cox models fit on train+val; primary association metric = adjusted HR per SD on the full cohort (stratified by split)"
   baseline_value: 0.657          # clinical Cox on TH-complete test (R5 full test: 0.647)
