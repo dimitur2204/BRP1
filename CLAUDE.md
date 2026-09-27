@@ -6,6 +6,8 @@ Inspired and based on an trying to work off of two white paper studies:
 
 Different tests and ideas are introduced and each one is commited separately on a branch.
 
-**Always read `PLAN.md` (staged plan + status) and `PROGRESS.md` (detailed
-running log of what was built/found/decided) before starting work.** Update
-both after any real progress — don't duplicate their content here.
+Run sbatch scripts that you only consider small and easy to monitor, for bigger sbatch scripts, leave them until the very end of your research when you really need the output to continue on. I will run them manually.
+
+Autoresearch state (read first): `research-state.yaml`, `findings.md`,
+`research-log.md`. `PLAN.md` / `PROGRESS.md` hold the heart-radiomics
+(R0–R5) plan and log that this work builds on.

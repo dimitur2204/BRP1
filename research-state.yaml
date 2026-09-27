@@ -1,0 +1,95 @@
+# Research State — Central Project Tracking (autoresearch)
+
+project:
+  title: "Immune vs vascular aging on lung-screening CT: thymic health, cardiac calcium and lung-cancer risk in NLST"
+  question: >
+    Do CT-derived markers of two aging axes (immune: published thymic-health
+    score, Bernatz et al. Nature 2026; vascular/cardiac: our heart calcium and
+    pericardial-fat features) carry independent, additive information about
+    lung-cancer incidence beyond age, sex and smoking status, or are they
+    proxies of the same unmeasured smoking burden?
+  status: active
+  started: "2026-09-27"
+  domain: "opportunistic CT imaging biomarkers / survival analysis"
+  branch: thymus-heart-aging          # built on heart-radiomics (a5c0fc8)
+
+prior_work:
+  heart_radiomics_R0_R5: >
+    6,205 QC-passed NLST baseline LDCTs (train 2147/710 ev, val 2018/154,
+    test 2040/154). Cardiac calcium proxy replicated (test HR/SD 1.32,
+    p=0.0006) beyond age/sex/smoking. Test C: clinical 0.647, clinical+calcium
+    0.658 (dC +0.011, p=0.08), Cox-EN heart+clinical 0.662 (dC +0.014, p=0.03).
+    DeepSurv/RSF did not beat linear Cox. See PROGRESS.md.
+
+literature:
+  key_papers:
+    - id: bernatz2026thymic
+      title: "Thymic health consequences in adults"
+      venue: "Nature 652, 986-994 (2026)"
+      relevance: "Source of the NLST thymic-health score; lung-cancer incidence HR 0.64 high vs low (6-yr)"
+    - id: bernatz2026ici
+      title: "Thymic health and immunotherapy outcomes in patients with cancer"
+      venue: "Nature 652, 995-1003 (2026)"
+      relevance: "Same score; prognostic for ICI outcomes; independent of PD-L1/TMB"
+  survey: "literature/survey.md"      # written by background lit agent
+  open_problems:
+    - "No study has combined thymic health with cardiac calcium on the same scans"
+    - "Whether the TH-lung-cancer association survives adjustment for emphysema / cardiac markers is unknown"
+  evidence_gaps:
+    - "IDC-780 lacks pack-years; emphysema read (ctab 59) is the best available smoking-burden proxy"
+
+hypotheses:
+  - id: H1
+    statement: "Published thymic health (TH) is inversely associated with lung-cancer incidence in our cohort beyond age/sex/smoking (high vs low HR in [0.5, 0.85], p<0.05)"
+    status: pending
+    priority: high
+    parent: null
+  - id: H2
+    statement: "Lower TH is associated with more cardiac calcium and more pericardial fat, adjusted for age/sex/smoking (partial rho(TH, calcium) in [-0.15,-0.02]; rho(TH, fat) negative, |rho|>0.1)"
+    status: pending
+    priority: high
+    parent: null
+  - id: H3
+    statement: "TH and calcium are independent: in a joint Cox both stay p<0.05 and each log-HR attenuates <15% vs single-marker models"
+    status: pending
+    priority: high
+    parent: null
+  - id: H4
+    statement: "Clinical+TH+calcium beats clinical on held-out test (dC CI excludes 0) and beats clinical+calcium (point estimate)"
+    status: pending
+    priority: high
+    parent: null
+  - id: H5
+    statement: "Smoking-burden proxy test: adjusting for radiologist-read emphysema attenuates the calcium log-HR >=25% (proxy) vs <10% (independent)"
+    status: pending
+    priority: medium
+    parent: null
+  - id: H6
+    statement: "Validity: calcium proxy discriminates radiologist 'significant CV abnormality' (ctab 60, yr0) with AUC >= 0.75; TH is inversely associated with ctab 60"
+    status: pending
+    priority: medium
+    parent: null
+
+experiments:
+  proxy_metric: "Held-out test Harrell's C (n=2,040-ish, ~150 events) of Cox models fit on train+val; primary association metric = adjusted HR per SD on the full cohort (stratified by split)"
+  baseline_value: 0.647          # clinical Cox, R5
+  best_value: 0.662              # Cox-EN heart+clinical, R5
+  total_runs: 0
+  trajectory: []
+
+outer_loop:
+  cycle: 0
+  last_direction: null
+  last_reflection: ""
+
+pending_human_actions:
+  - "Optional sbatch (R6 controls: lungs/sternum radiomics) — deferred until needed"
+  - "CDAS request for pack-years/mortality (docs/future_data_request_cdas.md)"
+
+workspace:
+  findings: "findings.md"
+  log: "research-log.md"
+  literature_dir: "literature/"
+  experiments_dir: "experiments/"
+  to_human_dir: "to_human/"
+  paper_dir: "paper/"
