@@ -65,26 +65,27 @@ addresses explicitly rather than hoping away.
 - Old CNN-pipeline PLAN/PROGRESS were committed (`eb3b89b`), then removed.
   `src/stage*` CNN code stays in the repo untouched. `src/organs.py` is reused.
 
-## Blockers / open items
+## Clinical data (resolved 2026-09-26)
 
-- **Clinical covariates are not readable by us.** `meta/nlst_780/nlst_780_prsn_idc_20210527.csv`
-  (age, sex, race, cigsmok) is `rw-rw----` owned by `mer:mer`, and we are
-  in group `aura_thymus`, not `mer`. The mentor needs to grant access (e.g.
-  `chgrp aura_thymus` + `chmod g+r`, or put a copy somewhere readable).
-  **Without it, the clinical baseline and confound adjustment are impossible,**
-  and results can't separate heart signal from age. Stages R0–R2 can proceed
-  meanwhile.
-- The cardiac sanity label (`ctab` code 60, "Significant cardiovascular
-  abnormality") sits in `nlst_780_ctab_idc_20210527.csv`, which has the same
-  permission problem.
-- Checked alternatives (2026-09-26), and none carries clinical covariates:
-  `nlst.csv` has `PatientAge`/`PatientSex` 100% empty. The second copy at
-  `discovery_pipeline/nlst_root/meta/nlst_780/` is also owner-only.
-  `derived/` contains only images, masks and embeddings.
+- Source: `data/external/nlst_780/nlst_780/` is our own download of the
+  public TCIA package `package-nlst-780.2021-05-28.zip` (CC BY 4.0, no request
+  needed). It is byte-identical to the mentor's owner-only `meta/nlst_780/`
+  copy, and covers all 6,373 cohort pids.
+- `prsn`: age (43–79), gender, race, cigsmok for 53,452 participants.
+  `ctab`: 177,487 abnormality rows, of which code 60 ("significant
+  cardiovascular abnormality") = 4,564 rows across 2,714 pids (all study years).
+  R7 must use `study_yr == 0` only.
+- **Still unavailable:** death / cause of death, pack-years, BMI,
+  comorbidities. These are only in the full NLST data via a CDAS project
+  request (https://cdas.cancer.gov/nlst/). The lack of pack-years is a
+  known residual confounder (see feasibility route 1). **To propose to the
+  mentor:** a CDAS request is planned. What to ask for and why is in
+  `docs/future_data_request_cdas.md`.
 
-## Staged pipeline (status: nothing built yet)
+## Staged pipeline
 
-**R0 — Cohort build.** ⬜ Enriched pids ∩ manifest. For each pid, check that
+**R0 — Cohort build.** ✅ `src/r0_build_cohort.py` → 6,306 pids / 1,037 events
+(test 2,067 / 157). See PROGRESS.md. Enriched pids ∩ manifest. For each pid, check that
 `derived/ct_1x1x2mm/{pid}_yr0.nii.gz` and `derived/totalseg_fullres/{pid}_yr0/seg.nii.gz`
 exist (lookup by name only, never enumerate). Join kernel/kVp from the
 manifest, and manufacturer/model plus acquisition parameters parsed from
@@ -93,13 +94,16 @@ harmonization; join clinical data once
 accessible. Output `data/pid_lists/heart_cohort_v1.csv` plus an attrition
 table (how many dropped, how many events lost, per split).
 
-**R1 — Visual QC.** ⬜ Heart mask (TotalSegmentator label 51) overlaid on CT
+**R1 — Visual QC.** ✅ `src/r1_heart_qc.py`, `src/cardiac.py`. Masks good; the calcium
+definition needed 0.7 mm smoothing (sharp-kernel noise). See PROGRESS.md. Heart mask (TotalSegmentator label 51) overlaid on CT
 for about 10 patients spanning different kernels/manufacturers. Plot the
 in-mask HU histogram. Look specifically at the lung/fat border (partial volume)
 and whether coronary calcium falls inside or just outside the mask.
 Output: `figs/r1_heart_qc/`.
 
-**R2 — Radiomics extraction (Slurm array, CPU `short`).** ⬜
+**R2 — Radiomics extraction (Slurm array, CPU `short`).** 🔄 script + sbatch written
+and tested locally (3 pids); ✅ run 2 (job 777378) merged: 6,295/6,306 extracted, with qc_* flags.
+Run 1 was superseded by the mask fix (largest connected component).
 `src/r2_extract_radiomics.py` + `src/submit_r2_radiomics.sh`.
 - pyradiomics 3.1.0 (has a wheel for our py3.9 venv). Image
   `ct_1x1x2mm`, mask = seg==51. Resample to 2×2×2 mm isotropic (B-spline
@@ -110,14 +114,20 @@ Output: `figs/r1_heart_qc/`.
   would add about 1,000 features, which is too many for 1,061 events.
 - **Hand-crafted cardiac features** (the most likely carriers of signal):
   heart volume; **calcium burden proxy** (volume and density-weighted
-  sum of voxels ≥130 HU within the heart mask dilated 3 mm, excluding
-  bone/aorta labels; explicitly *not* a clinical Agatston score on 2 mm
+  sum of voxels ≥130 HU on the CT smoothed at 0.7 mm, within the heart mask
+  dilated 3 mm, excluding bone/aorta labels; explicitly *not* a clinical Agatston score on 2 mm
   resampled low-dose CT); **pericardial fat volume and mean HU** (−190…−30 HU
-  in a 0–10 mm shell around the heart, excluding lung).
+  in a 0–10 mm shell around the heart, excluding lung); **core noise SD** (HU
+  SD ≥5 mm inside the heart, a measured kernel/dose sharpness covariate for R3).
 - Per-patient output: one row. Merged to `data/radiomics/heart_features_v1.csv`.
   Failures are logged, not silently dropped.
 
-**R3 — Feature QC, harmonization, univariate association.** ⬜
+**R3 — Feature QC, harmonization, univariate association.** ✅ `src/r3_feature_qc.py`
+→ `figs/r3_feature_qc/`, `data/radiomics/r3_*.csv`. Key result: calcium burden replicates on test. See PROGRESS.md.
+- Patient exclusions (from R2 `qc_*` / `card_*` fields; thresholds from the
+  R2 outlier review): heart volume <250 mL (non-covering/garbage scans),
+  `qc_metal_voxels` ≥5, `qc_heart_touches_z_edge`. Report n and events
+  excluded per split.
 - Drop features that are constant, missing or near-zero-variance. Cluster
   features with |Spearman| > 0.95 and keep one representative each.
 - **Kernel-leakage probe:** how well do the features predict kernel group
@@ -128,7 +138,8 @@ Output: `figs/r1_heart_qc/`.
   for age/sex/smoking, with BH-FDR. Volcano/forest plot. This is the most
   interpretable answer to "is there *any* relation."
 
-**R4 — Models (train+val via 5-fold CV for tuning; test held out once).** ⬜
+**R4 — Models (tuned on val, refit on train+val; test held out once).** ✅ `src/r4_models.py` Input:
+`data/radiomics/heart_features_v1_r3.csv` (harmonized) + `r3_selected_features.csv` (57 features).
 1. Clinical-only Cox (age, sex, smoking status): the bar to beat.
 2. Cox elastic-net on radiomics; the same with clinical covariates added.
 3. Random Survival Forest (scikit-survival).
@@ -139,7 +150,8 @@ Output: `figs/r1_heart_qc/`.
 5. Null control: DeepSurv on permuted survival labels, which should give a
    C-index of about 0.5.
 
-**R5 — Evaluation on held-out test (2,080 patients, 160 events).** ⬜
+**R5 — Evaluation on held-out test (2,040 patients, 154 events after R3 exclusions).** ✅
+`src/r5_evaluate.py` → `data/r5_test_metrics.csv`, `figs/r5_evaluation/`. See PROGRESS.md.
 - Harrell's and Uno's C-index with bootstrap 95% CI. **ΔC vs the clinical
   model** (paired bootstrap): the key incremental-value number.
 - Time-dependent AUC at 2/4/6 years. HR per SD of each model's risk score

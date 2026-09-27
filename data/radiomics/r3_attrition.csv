@@ -1,0 +1,7 @@
+step,n,events,train_n,train_events,val_n,val_events,test_n,test_events
+R0 cohort,6306,1037,2191,725,2048,155,2067,157
+heart mask extracted,6295,1036,2187,724,2041,155,2067,157
+heart volume >= 250 mL,6232,1025,2161,716,2023,154,2048,155
+metal voxels < 5,6209,1019,2148,711,2019,154,2042,154
+heart not cut off at scan edge,6205,1018,2147,710,2018,154,2040,154
+known kernel group,6205,1018,2147,710,2018,154,2040,154

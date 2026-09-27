@@ -1,0 +1,2 @@
+pid,heart_ok,event,manufacturer,kernel,kernel_group,slice_thickness_mm,frac_below_-100HU,qc_heart_n_components,qc_heart_dropped_ml,qc_heart_touches_z_edge,qc_metal_voxels,card_heart_volume_ml,card_heart_mean_hu,card_heart_sd_hu,card_core_noise_sd_hu,card_calc_volume_ml,card_calc_mass_proxy,card_calc_n_lesions,card_calc_any,card_fat_volume_ml,card_fat_mean_hu
+103665,1,1,GE MEDICAL SYSTEMS,STANDARD,soft,2.5,0.00018075518268739326,5,54.716,0,0,320.87600000000003,42.69310760498047,32.71221923828125,16.02845001220703,3.206,605.271375,7,1,85.298,-78.19353485107422

@@ -1,0 +1,23 @@
+target,features,stage,n_features,auc_val_test
+kernel (sharp vs soft),all,before ComBat,115,0.8887819862713909
+kernel (sharp vs soft),all,after ComBat,115,0.5373440052096122
+kernel (sharp vs soft),card,before ComBat,8,0.8426734491262158
+kernel (sharp vs soft),card,after ComBat,8,0.5208264387817194
+kernel (sharp vs soft),shape,before ComBat,14,0.5301149566399425
+kernel (sharp vs soft),shape,after ComBat,14,0.49936258758304597
+kernel (sharp vs soft),firstorder,before ComBat,18,0.8341762478693612
+kernel (sharp vs soft),firstorder,after ComBat,18,0.5201961433212701
+kernel (sharp vs soft),texture,before ComBat,75,0.8495190716641935
+kernel (sharp vs soft),texture,after ComBat,75,0.5279473985744736
+manufacturer,all,before ComBat,115,0.9231735467424818
+manufacturer,all,after ComBat,115,0.5240247479034024
+manufacturer,card,before ComBat,8,0.8052461847809149
+manufacturer,card,after ComBat,8,0.49286552635278724
+manufacturer,shape,before ComBat,14,0.5595884713964899
+manufacturer,shape,after ComBat,14,0.48931494450361157
+manufacturer,firstorder,before ComBat,18,0.8009338792839097
+manufacturer,firstorder,after ComBat,18,0.5031657251439166
+manufacturer,texture,before ComBat,75,0.8811642114736373
+manufacturer,texture,after ComBat,75,0.51646951173837
+sex (biology check),card_heart_volume_ml,before ComBat,1,0.8646068850823048
+sex (biology check),card_heart_volume_ml,after ComBat,1,0.8645258372595233

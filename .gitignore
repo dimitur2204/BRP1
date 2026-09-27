@@ -27,3 +27,20 @@ __pycache__/
 
 # Grad-CAM volumes (~254MB .nii.gz) -- regenerate via src/submit_stage6_saliency.sh
 data/saliency/
+
+# Public NLST IDC-780 clinical package (TCIA, CC BY 4.0) -- regenerate with:
+#   mkdir -p data/external/nlst_780 && cd data/external/nlst_780 && curl -sSLO \
+#     https://www.cancerimagingarchive.net/wp-content/uploads/package-nlst-780.2021-05-28.zip \
+#     && unzip -q package-nlst-780.2021-05-28.zip && cd nlst_780 \
+#     && unzip -q nlst780.idc.delivery.052821.zip && for z in *.csv.zip; do unzip -q "$z"; done
+data/external/
+
+# R2 per-array-task chunk CSVs -- merged into data/radiomics/{organ}_features_v1.csv
+# by `src/r2_extract_radiomics.py --merge`
+data/radiomics/*_chunks/
+
+# R2/R3 per-patient feature tables (~13-14MB each) -- regenerate with:
+#   sbatch src/submit_r2_radiomics.sh && env/.venv/bin/python src/r2_extract_radiomics.py --merge
+#   env/.venv/bin/python src/r3_feature_qc.py
+data/radiomics/heart_features_v1.csv
+data/radiomics/heart_features_v1_r3.csv
