@@ -1,0 +1,68 @@
+histology counts (events): {'adeno': 463, 'squamous': 228, 'other': 175, 'small_cell': 125, 'none': 12}
+     histology           marker  events      var    coef      se      hr      lo      hi       p
+0        adeno          calcium     463   calc_z  0.0821  0.0478  1.0856  0.9885  1.1922  0.0858
+1        adeno  current smoking     463  cigsmok  0.1780  0.0941  1.1948  0.9935  1.4369  0.0586
+2        adeno              age     463      age  0.0600  0.0089  1.0618  1.0434  1.0805  0.0000
+3        adeno        emphysema     463    emph0  0.3799  0.0956  1.4621  1.2122  1.7635  0.0001
+4        adeno               TH     463     th_z  0.0551  0.0496  1.0566  0.9587  1.1646  0.2671
+5        SQ/SC          calcium     353   calc_z  0.1635  0.0527  1.1776  1.0621  1.3056  0.0019
+6        SQ/SC  current smoking     353  cigsmok  0.7306  0.1116  2.0763  1.6683  2.5840  0.0000
+7        SQ/SC              age     353      age  0.0871  0.0101  1.0910  1.0697  1.1128  0.0000
+8        SQ/SC        emphysema     353    emph0  0.5757  0.1079  1.7783  1.4394  2.1971  0.0000
+9        SQ/SC               TH     353     th_z -0.1456  0.0585  0.8645  0.7709  0.9695  0.0128
+10    squamous          calcium     228   calc_z  0.2033  0.0643  1.2255  1.0803  1.3901  0.0016
+11    squamous  current smoking     228  cigsmok  0.6392  0.1371  1.8950  1.4485  2.4793  0.0000
+12    squamous              age     228      age  0.0938  0.0125  1.0983  1.0717  1.1256  0.0000
+13    squamous        emphysema     228    emph0  0.6751  0.1342  1.9641  1.5098  2.5552  0.0000
+14    squamous               TH     228     th_z -0.1793  0.0736  0.8359  0.7236  0.9656  0.0149
+15  small_cell          calcium     125   calc_z  0.0842  0.0919  1.0879  0.9086  1.3025  0.3592
+16  small_cell  current smoking     125  cigsmok  0.9042  0.1934  2.4701  1.6908  3.6084  0.0000
+17  small_cell              age     125      age  0.0753  0.0170  1.0782  1.0429  1.1146  0.0000
+18  small_cell        emphysema     125    emph0  0.3897  0.1827  1.4765  1.0321  2.1123  0.0329
+19  small_cell               TH     125     th_z -0.0878  0.0967  0.9159  0.7579  1.1070  0.3637
+20       other          calcium     175   calc_z  0.1900  0.0755  1.2092  1.0429  1.4019  0.0118
+21       other  current smoking     175  cigsmok  0.6073  0.1580  1.8355  1.3466  2.5018  0.0001
+22       other              age     175      age  0.0600  0.0145  1.0619  1.0322  1.0924  0.0000
+23       other        emphysema     175    emph0  0.6659  0.1532  1.9462  1.4414  2.6277  0.0000
+24       other               TH     175     th_z -0.1246  0.0809  0.8829  0.7534  1.0346  0.1236 
+             marker  hr_adeno  hr_sqsc  delta_logHR  hr_ratio  ratio_lo  ratio_hi       p
+0          calcium    1.0856   1.1776       0.0813    1.0847    0.9436    1.2470  0.2527
+1  current smoking    1.1948   2.0763       0.5526    1.7377    1.3053    2.3134  0.0002
+2              age    1.0618   1.0910       0.0272    1.0275    1.0008    1.0550  0.0435
+3        emphysema    1.4621   1.7783       0.1958    1.2163    0.9169    1.6134  0.1745
+4               TH    1.0566   0.8645      -0.2007    0.8182    0.7040    0.9509  0.0089
+                                  window     n  events     var    coef      se      hr      lo      hi       p
+0                     0-1 yr (truncated)  6041     268  calc_z  0.1427  0.0604  1.1534  1.0246  1.2983  0.0182
+1               >1 yr (landmark at 1 yr)  5714     735  calc_z  0.1327  0.0374  1.1419  1.0613  1.2287  0.0004
+2  >3 yr (landmark at 3 yr, exploratory)  5259     383  calc_z  0.1542  0.0518  1.1667  1.0540  1.2914  0.0029
+3     T0-screen cancers (cause-specific)  6041     272  calc_z  0.1326  0.0602  1.1418  1.0148  1.2848  0.0276
+4     cancyr>=1 cancers (cause-specific)  6041     731  calc_z  0.1364  0.0374  1.1462  1.0652  1.2334  0.0003 
+ {'delta_logHR': 0.0038, 'hr_ratio': 1.0038, 'ratio_lo': 0.8736, 'ratio_hi': 1.1534, 'p': 0.9572}
+              category     n  events range_mass_proxy      hr      lo      hi       p
+0   zero calcium (ref)   771     104                0  1.0000  1.0000  1.0000     NaN
+1  non-zero tertile T1  1757     253          0.0-1.9  1.0689  0.8503  1.3437  0.5682
+2  non-zero tertile T2  1756     280         1.9-11.3  1.0796  0.8598  1.3555  0.5097
+3  non-zero tertile T3  1757     366      11.3-4170.3  1.3592  1.0869  1.6998  0.0071 
+ {'trend_hr_per_category': 1.1126951164175654, 'trend_p': 0.0012689964199294904}
+                                            spec     n  events       var    coef      se      hr      lo      hi       p
+0   reference: strata split, adj age/sex/smoking  6041    1003    calc_z  0.1346  0.0318  1.1441  1.0750  1.2176  0.0000
+1  (i) strata split x sex x age5 (+age, smoking)  6041    1003    calc_z  0.1348  0.0318  1.1443  1.0752  1.2179  0.0000
+2     (ii) age restricted cubic spline (4 knots)  6041    1003    calc_z  0.1355  0.0318  1.1451  1.0760  1.2187  0.0000
+3          (iii) former smokers only (+age, sex)  3049     415    calc_z  0.0802  0.0493  1.0835  0.9836  1.1935  0.1041
+4         (iii) current smokers only (+age, sex)  2992     588    calc_z  0.1767  0.0418  1.1932  1.0994  1.2951  0.0000
+5    (iii) calcium x current-smoking interaction  6041    1003  ca_x_smk  0.0852  0.0617  1.0889  0.9649  1.2289  0.1672
+6   (iv) + scanner batch dummies + core noise SD  6041    1003    calc_z  0.1580  0.0326  1.1712  1.0986  1.2486  0.0000
+              marker  auc_sharp_vs_soft  leak_auc_sym  leak_auc_GE  leak_auc_Philips  leak_auc_SIEMENS  leak_auc_TOSHIBA  scanner_partial_r2
+0                 TH             0.4823        0.5177       0.5575            0.5107            0.5705            0.5000              0.0177
+1  calcium (raw log)             0.5426        0.5426       0.5852            0.5105            0.6078            0.5205              0.0369
+2    pericardial fat             0.4651        0.5349       0.5371            0.5030            0.5318            0.5450              0.0122 
+            batch     n  th_mean  th_sd  calc_mean
+0       GE_sharp    73    41.53  28.72       2.90
+1        GE_soft  3169    51.95  29.48       1.53
+2  Philips_sharp   470    50.21  27.56       1.70
+3   Philips_soft    61    48.15  27.59       1.79
+4  SIEMENS_sharp   211    44.41  26.35       2.23
+5   SIEMENS_soft  1684    44.10  28.19       2.07
+6  TOSHIBA_sharp   263    46.86  27.37       1.85
+7   TOSHIBA_soft   110    54.16  26.81       1.25 
+ {'th_hr_base': 0.950481030296158, 'th_hr_batch_adj': 0.9475331691559089, 'th_hr_batch_adj_lo': 0.8861199156442737, 'th_hr_batch_adj_hi': 1.0132027176004281, 'th_hr_change': -0.0029478611402491417}
