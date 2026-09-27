@@ -41,7 +41,7 @@ literature:
 hypotheses:
   - id: H1
     statement: "Published thymic health (TH) is inversely associated with lung-cancer incidence in our cohort beyond age/sex/smoking (high vs low HR in [0.5, 0.85], p<0.05)"
-    status: refuted   # adj HR/SD 0.95 [0.89,1.02]; high vs low 0.90; signal absorbed by age (E1)
+    status: revised   # case-cohort E1: 0.95 n.s.; full CT arm (E5): adj 0.91/SD p=0.004, high vs low 0.81 -> association real but histology-specific
     priority: high
     parent: null
   - id: H2
@@ -104,12 +104,12 @@ hypotheses:
 
   - id: H13
     statement: "Our TH pipeline reproduces the paper on the full NLST CT arm: unadjusted 6-yr high vs low HR within [0.53, 0.76]"
-    status: pending
+    status: supported # 6-yr unadj high vs low 0.649 [0.54,0.78] vs paper 0.64 [0.53,0.76] (E5)
     priority: medium
     parent: H1
   - id: H14
     statement: "TH x histology heterogeneity holds in the full (unsampled) CT arm: LM interaction < 1, p<0.05; SQ/SC HR/SD < 0.92; adeno CI includes 1"
-    status: pending
+    status: supported # full CT arm LM interaction 0.835 p=0.019; SQ/SC 0.83, adeno 1.00 (E5)
     priority: high
     parent: H12
 
@@ -128,7 +128,7 @@ experiments:
     - {run_id: E2-emph-TH-Ca, hypothesis: H5, metric_value: 0.685, delta: 0.028, change_summary: "+ emphysema + TH + calcium"}
 
 outer_loop:
-  cycle: 1
+  cycle: 3
   last_direction: deepen
   last_reflection: >
     Calcium is robust, independent of TH and emphysema, +0.01 C on every base.
