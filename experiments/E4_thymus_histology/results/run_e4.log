@@ -1,0 +1,32 @@
+D1 {'interaction_hr': 0.8182, 'interaction_lo': 0.7019, 'interaction_hi': 0.9537, 'interaction_p': 0.0103, 'th_hr_adeno': 1.0566, 'th_hr_sqsc': 0.8645}
+               adjustment  hr_adeno  hr_adeno_lo  hr_adeno_hi  hr_sqsc  hr_sqsc_lo  hr_sqsc_hi  p_sqsc  coef_sqsc  ratio_delta_logHR  ratio_hr_ratio  ratio_ratio_lo  ratio_ratio_hi  ratio_p  sqsc_logHR_attenuation
+0                clinical    1.0566       0.9587       1.1646   0.8645      0.7709      0.9695  0.0128    -0.1456            -0.2007          0.8182          0.7040          0.9509   0.0089                  0.0000
+1              +emphysema    1.0700       0.9709       1.1793   0.8770      0.7822      0.9833  0.0245    -0.1313            -0.1989          0.8196          0.7054          0.9523   0.0094                  0.0986
+2      +emphysema+calcium    1.0831       0.9822       1.1943   0.8993      0.8015      1.0090  0.0707    -0.1061            -0.1860          0.8303          0.7139          0.9657   0.0158                  0.2710
+3  +emphysema+calcium+fat    1.0611       0.9584       1.1748   0.8972      0.7959      1.0114  0.0759    -0.1085            -0.1678          0.8455          0.7225          0.9894   0.0364                  0.2548
+            subset     n  ev_adeno  ev_sqsc  hr_adeno  hr_sqsc  delta_logHR  hr_ratio  ratio_lo  ratio_hi       p
+0      split=train  2098       332      234    1.0608   0.9383      -0.1226    0.8846    0.7371    1.0616  0.1877
+1        split=val  1960        68       61    1.3388   0.7862      -0.5323    0.5872    0.4024    0.8570  0.0058
+2       split=test  1983        63       58    0.8212   0.6703      -0.2031    0.8162    0.5539    1.2027  0.3045
+3            women  2363       214      106    1.0552   0.8569      -0.2082    0.8121    0.6477    1.0181  0.0711
+4              men  3678       249      247    1.0478   0.8670      -0.1894    0.8275    0.6734    1.0168  0.0716
+5   former smokers  3049       219      128    1.0613   0.7878      -0.2980    0.7423    0.5804    0.9492  0.0175
+6  current smokers  2992       244      225    1.0552   0.9035      -0.1552    0.8563    0.7057    1.0389  0.1156
+                          analysis           marker     var    coef      se      hr      lo      hi       p  events     n  ratio_delta_logHR  ratio_hr_ratio  ratio_ratio_lo  ratio_ratio_hi  ratio_p
+0     adeno: BAC/lepidic 8250-8255               TH    th_z  0.0634  0.1001  1.0654  0.8755  1.2964  0.5270     110  6041                NaN             NaN             NaN             NaN      NaN
+1                     adeno: other               TH    th_z  0.0511  0.0571  1.0524  0.9409  1.1771  0.3714     353  6041                NaN             NaN             NaN             NaN      NaN
+2     stage I-II (all histologies)               TH    th_z -0.0178  0.0453  0.9824  0.8990  1.0735  0.6940     561  6041                NaN             NaN             NaN             NaN      NaN
+3   stage III-IV (all histologies)               TH    th_z -0.0899  0.0523  0.9140  0.8250  1.0126  0.0854     427  6041                NaN             NaN             NaN             NaN      NaN
+4                comparator: adeno  pericardial fat   fat_z -0.1186  0.0554  0.8881  0.7968  0.9900  0.0322     463  6041                NaN             NaN             NaN             NaN      NaN
+5                comparator: SQ/SC  pericardial fat   fat_z -0.0179  0.0599  0.9823  0.8734  1.1047  0.7652     353  6041             0.1007          1.1060          0.9425          1.2978   0.2172
+6                comparator: adeno     heart volume    hv_z -0.1490  0.0599  0.8616  0.7661  0.9690  0.0129     463  6041                NaN             NaN             NaN             NaN      NaN
+7                comparator: SQ/SC     heart volume    hv_z -0.0698  0.0645  0.9325  0.8218  1.0582  0.2788     353  6041             0.0791          1.0824          0.9108          1.2862   0.3687
+8                comparator: adeno          calcium  calc_z  0.0821  0.0478  1.0856  0.9885  1.1922  0.0858     463  6041                NaN             NaN             NaN             NaN      NaN
+9                comparator: SQ/SC          calcium  calc_z  0.1635  0.0527  1.1776  1.0621  1.3056  0.0019     353  6041             0.0813          1.0847          0.9436          1.2470   0.2527
+10               comparator: adeno               TH    th_z  0.0551  0.0496  1.0566  0.9587  1.1646  0.2671     463  6041                NaN             NaN             NaN             NaN      NaN
+11               comparator: SQ/SC               TH    th_z -0.1456  0.0585  0.8645  0.7709  0.9695  0.0128     353  6041            -0.2007          0.8182          0.7040          0.9509   0.0089
+         model       c    c_lo    c_hi  dc_vs_clinical   dc_lo   dc_hi   dc_p  cause  test_events
+0     clinical  0.7203  0.6533  0.7749          0.0000  0.0000  0.0000    NaN  SQ/SC           58
+1  clinical+TH  0.7328  0.6725  0.7852          0.0126 -0.0001  0.0259  0.056  SQ/SC           58
+2     clinical  0.6301  0.5603  0.6908          0.0000  0.0000  0.0000    NaN  adeno           63
+3  clinical+TH  0.6139  0.5478  0.6729         -0.0162 -0.0338  0.0001  0.058  adeno           63

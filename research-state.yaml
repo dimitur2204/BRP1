@@ -98,7 +98,7 @@ hypotheses:
 
   - id: H12
     statement: "TH x histology heterogeneity (SQ/SC protective, adeno null) is robust to dose-marker adjustment (SQ/SC HR <=0.90, p<0.05, ratio <=0.87), consistent across splits/subgroups, and not shared by fat/heart-volume comparators"
-    status: pending
+    status: mostly-supported # LM interaction 0.82 p=0.010; 7/7 subsets; 25% atten by dose markers (calcium); test SQ/SC dC +0.013 (E4)
     priority: high
     parent: H1
 
