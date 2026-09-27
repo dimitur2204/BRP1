@@ -28,6 +28,9 @@ Usage:
     env/.venv/bin/python src/r2_extract_radiomics.py --limit 3 --out-dir /tmp/r2test
     # after all array tasks finish
     env/.venv/bin/python src/r2_extract_radiomics.py --merge
+    # full-CT-arm calcium run (cardiac features only; see submit_r2_fullarm.sh)
+    env/.venv/bin/python src/r2_extract_radiomics.py --cardiac-only --tag fullarm \
+        --cohort data/pid_lists/heart_cohort_fullarm.csv --chunk 0 --n-chunks 40
 """
 from __future__ import annotations
 
@@ -107,12 +110,17 @@ def organ_crop(organ: str, ct, seg, axcodes, vox):
     return ct[sl], seg[sl], mask[sl], {}
 
 
-def extract_one(pid: str, organ: str, ext_shape, ext_tex) -> dict:
+def extract_one(pid: str, organ: str, ext_shape, ext_tex, cardiac_only: bool = False) -> dict:
     ct, seg, axcodes, vox = load_patient(pid)
     crop = organ_crop(organ, ct, seg, axcodes, vox)
     if crop is None:
         return {"status": "no_mask"}
     ct_c, seg_c, mask, qc = crop
+    if cardiac_only:  # hand-crafted cardiac features + qc only, no pyradiomics (full-CT-arm run)
+        row = {"mask_voxels": int(mask.sum()), **qc}
+        row.update(cardiac_features(ct_c, heart_regions(ct_c, seg_c, vox), vox))
+        row["status"] = "ok"
+        return row
     ct_img = to_sitk(ct_c.astype(np.float32), vox)
 
     row = {"mask_voxels": int(mask.sum()), **qc}
@@ -134,17 +142,17 @@ def run_chunk(args) -> None:
     else:
         pids = np.array_split(pids, args.n_chunks)[args.chunk].tolist()
 
-    out_dir = Path(args.out_dir or RADIOMICS_DIR / f"{args.organ}_v1_chunks")
+    out_dir = Path(args.out_dir or RADIOMICS_DIR / f"{args.organ}_{args.tag}_chunks")
     out_dir.mkdir(parents=True, exist_ok=True)
     out_csv = out_dir / f"chunk_{args.chunk:03d}.csv"
     print(f"organ={args.organ} chunk {args.chunk}/{args.n_chunks}: {len(pids)} pids -> {out_csv}", flush=True)
 
-    ext_shape, ext_tex = make_extractor(["shape"]), make_extractor(TEXTURE_CLASSES)
+    ext_shape, ext_tex = (None, None) if args.cardiac_only else (make_extractor(["shape"]), make_extractor(TEXTURE_CLASSES))
     rows = []
     for i, pid in enumerate(pids):
         t0 = time.time()
         try:
-            row = extract_one(pid, args.organ, ext_shape, ext_tex)
+            row = extract_one(pid, args.organ, ext_shape, ext_tex, args.cardiac_only)
         except Exception as e:  # keep going; the failure is recorded, not dropped
             row = {"status": f"error:{type(e).__name__}:{e}"[:300]}
         row = {"pid": pid, **row, "seconds": round(time.time() - t0, 1)}
@@ -156,7 +164,7 @@ def run_chunk(args) -> None:
 
 
 def merge(args) -> None:
-    chunk_dir = RADIOMICS_DIR / f"{args.organ}_v1_chunks"
+    chunk_dir = RADIOMICS_DIR / f"{args.organ}_{args.tag}_chunks"
     chunks = sorted(chunk_dir.glob("chunk_*.csv"))
     df = pd.concat([pd.read_csv(c, dtype={"pid": str}) for c in chunks], ignore_index=True)
     cohort = pd.read_csv(args.cohort, dtype={"pid": str})
@@ -166,7 +174,7 @@ def merge(args) -> None:
     errs = df[df["status"].str.startswith("error")]
     if len(errs):
         print("errors (first 10):\n" + errs[["pid", "status"]].head(10).to_string(index=False))
-    out = RADIOMICS_DIR / f"{args.organ}_features_v1.csv"
+    out = RADIOMICS_DIR / f"{args.organ}_features_{args.tag}.csv"
     df.sort_values("pid").to_csv(out, index=False)
     print(f"wrote {out}; seconds/patient median {df['seconds'].median():.1f}")
 
@@ -180,7 +188,12 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=0, help="local test: first N pids only")
     ap.add_argument("--out-dir", default=None)
     ap.add_argument("--merge", action="store_true")
+    ap.add_argument("--tag", default="v1", help="names the chunk dir ({organ}_{tag}_chunks) and merged CSV")
+    ap.add_argument("--cardiac-only", action="store_true",
+                    help="heart only: card_* + qc_* features, skip pyradiomics (full-CT-arm calcium run)")
     args = ap.parse_args()
+    if args.cardiac_only and args.organ != "heart":
+        ap.error("--cardiac-only needs --organ heart")
     merge(args) if args.merge else run_chunk(args)
 
 

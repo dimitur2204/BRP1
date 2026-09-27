@@ -1,0 +1,6 @@
+step,n,events,train_n,train_events,val_n,val_events,test_n,test_events
+pid list ∩ manifest,18899,9,15386,5,1772,2,1741,2
+series is baseline (study yr 0),18898,9,15385,5,1772,2,1741,2
+has CT + TotalSegmentator mask,9969,9,8666,5,648,2,655,2
+CT z-extent >= 80 slices,9872,0,8596,0,633,0,643,0
+has age/sex/smoking,9872,0,8596,0,633,0,643,0

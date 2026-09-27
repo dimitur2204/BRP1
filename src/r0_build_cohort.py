@@ -29,9 +29,15 @@ mask anyway.
 
 Usage:
     env/.venv/bin/python src/r0_build_cohort.py
+    # full TH-scored CT arm minus the enriched cohort (for the full-arm calcium run)
+    env/.venv/bin/python src/r0_build_cohort.py \
+        --pids-file /faststorage/project/aura_thymus/discovery_pipeline/NLST_thymic_health_scores_published.csv \
+        --exclude-cohort data/pid_lists/heart_cohort_v1.csv \
+        --out data/pid_lists/heart_cohort_fullarm.csv --attrition data/pid_lists/heart_cohort_fullarm_attrition.csv
 """
 from __future__ import annotations
 
+import argparse
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -99,9 +105,25 @@ def load_acquisition() -> pd.DataFrame:
 
 
 def main() -> None:
-    enriched = set(ENRICHED_PIDS.read_text().split())
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--pids-file", default=str(ENRICHED_PIDS),
+                    help="whitespace-separated pids, or a CSV whose first column is the pid")
+    ap.add_argument("--exclude-cohort", default=None, help="cohort CSV whose pids are dropped (already built)")
+    ap.add_argument("--out", default=str(OUT_CSV))
+    ap.add_argument("--attrition", default=str(ATTRITION_CSV))
+    args = ap.parse_args()
+    out_csv, attrition_csv = Path(args.out), Path(args.attrition)
+
+    src = Path(args.pids_file)
+    if src.suffix == ".csv":
+        wanted = set(pd.read_csv(src, usecols=[0], dtype=str).iloc[:, 0])
+    else:
+        wanted = set(src.read_text().split())
+    if args.exclude_cohort:
+        wanted -= set(pd.read_csv(args.exclude_cohort, usecols=["pid"], dtype=str)["pid"])
+    print(f"{len(wanted)} requested pids from {src.name}")
     m = pd.read_csv(MANIFEST_CSV, dtype={"pid": str, "series_uid": str})
-    m = m[m["pid"].isin(enriched)]
+    m = m[m["pid"].isin(wanted)]
     df = m[["pid", "series_uid", "time", "event", "split", "kernel", "kvp", "image_count"]]
     df = df.merge(load_acquisition(), on="series_uid", how="left")
 
@@ -124,7 +146,7 @@ def main() -> None:
     df = df.merge(files, on="pid", how="left")
 
     steps = [
-        ("enriched ∩ manifest", np.ones(len(df), bool)),
+        ("pid list ∩ manifest", np.ones(len(df), bool)),
         ("series is baseline (study yr 0)", df["series_study_yr"] == 0),
         ("has CT + TotalSegmentator mask", (df["has_ct"] == 1) & (df["has_seg"] == 1)),
         (f"CT z-extent >= {MIN_Z_SLICES} slices", df["n_z"].fillna(0) >= MIN_Z_SLICES),
@@ -149,11 +171,11 @@ def main() -> None:
             "age", "sex", "race", "cigsmok",
             "manufacturer", "model", "kernel", "kernel_group", "kvp",
             "slice_thickness_mm", "recon_fov_mm", "tube_current_ma", "image_count", "n_z"]
-    OUT_CSV.parent.mkdir(parents=True, exist_ok=True)
-    out[cols].sort_values("pid").to_csv(OUT_CSV, index=False)
-    attrition.to_csv(ATTRITION_CSV, index=False)
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    out[cols].sort_values("pid").to_csv(out_csv, index=False)
+    attrition.to_csv(attrition_csv, index=False)
     print(f"\nkernel_group: {out['kernel_group'].value_counts().to_dict()}")
-    print(f"wrote {OUT_CSV} ({len(out)} rows) and {ATTRITION_CSV}")
+    print(f"wrote {out_csv} ({len(out)} rows) and {attrition_csv}")
 
 
 if __name__ == "__main__":

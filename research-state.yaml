@@ -113,6 +113,22 @@ hypotheses:
     priority: high
     parent: H12
 
+  - id: H15
+    statement: "Calcium HR/SD without case-cohort sampling (TotalSeg-covered CT arm ~16k) in [1.08, 1.25], p<0.001"
+    status: pending   # waits on user sbatch src/submit_r2_fullarm.sh
+    priority: medium
+    parent: null
+  - id: H16
+    statement: "Joint TH + calcium + emphysema on ~16k: both p<0.05, each attenuates <15%"
+    status: pending   # waits on user sbatch
+    priority: medium
+    parent: H3
+  - id: H17
+    statement: "TH x histology survives calcium adjustment on ~16k: LM interaction <1, p<0.05; SQ/SC TH HR <= 0.90"
+    status: pending   # waits on user sbatch
+    priority: high
+    parent: H14
+
 experiments:
   proxy_metric: "Held-out test Harrell's C (n=2,040-ish, ~150 events) of Cox models fit on train+val; primary association metric = adjusted HR per SD on the full cohort (stratified by split)"
   baseline_value: 0.657          # clinical Cox on TH-complete test (R5 full test: 0.647)
@@ -138,7 +154,9 @@ outer_loop:
     flexible age; TH kernel robustness.
 
 pending_human_actions:
+  - "sbatch src/submit_r2_fullarm.sh (40 tasks x ~9 min, cardiac-only, 9,872 pids), then: env/.venv/bin/python src/r2_extract_radiomics.py --merge --tag fullarm --cohort data/pid_lists/heart_cohort_fullarm.csv ; then run experiments/E6_fullarm_joint/code/run_e6.py"
   - "Optional sbatch (R6 controls: lungs/sternum radiomics) — deferred until needed"
+  - "~9k TH-scored CT-arm pids lack TotalSegmentator masks (mentor's GPU job) — only needed to reach the full 25k"
   - "CDAS request for pack-years/mortality (docs/future_data_request_cdas.md)"
 
 workspace:
