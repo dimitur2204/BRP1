@@ -70,6 +70,32 @@ hypotheses:
     priority: medium
     parent: null
 
+  - id: H7
+    statement: "Histology specificity (indirect pack-years test): if calcium proxies smoking dose, its HR is >=10% larger for squamous+small-cell than adenocarcinoma (positive control: current smoking)"
+    status: pending
+    priority: high
+    parent: H5
+  - id: H8
+    statement: "Calcium is a long-term risk marker: landmark (>1 yr) HR >= 1.10, CI excludes 1"
+    status: pending
+    priority: medium
+    parent: null
+  - id: H9
+    statement: "Monotone dose-response over zero / nonzero-tertile calcium; T3 vs zero HR > 1.3; trend p < 0.01"
+    status: pending
+    priority: medium
+    parent: null
+  - id: H10
+    statement: "Calcium HR >= 1.10 (p<0.01) under flexible age (strata / spline) and scanner adjustment; >1 in both smoking strata"
+    status: pending
+    priority: medium
+    parent: null
+  - id: H11
+    statement: "TH is scanner-robust: kernel leakage AUC < 0.60, scanner partial R2 < 2%, TH HR change < 0.02 with batch adjustment"
+    status: pending
+    priority: medium
+    parent: null
+
 experiments:
   proxy_metric: "Held-out test Harrell's C (n=2,040-ish, ~150 events) of Cox models fit on train+val; primary association metric = adjusted HR per SD on the full cohort (stratified by split)"
   baseline_value: 0.657          # clinical Cox on TH-complete test (R5 full test: 0.647)
