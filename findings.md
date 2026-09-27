@@ -2,93 +2,125 @@
 
 ## Research Question
 
-Do CT-derived markers of immune aging (thymic health) and vascular aging
-(cardiac calcium, pericardial fat) carry independent, additive information
-about lung-cancer incidence on NLST baseline low-dose CT, or do they proxy
-the same unmeasured smoking burden?
+Do CT-derived markers of immune aging (thymic health, Bernatz et al. Nature
+2026) and vascular aging (cardiac calcium, pericardial fat) carry independent,
+additive information about lung-cancer incidence on NLST baseline low-dose CT,
+or do they proxy the same unmeasured smoking burden?
 
-## Current Understanding
+## Current Understanding (after 5 experiments, 3 outer loops)
 
-On the same 6,041 NLST baseline LDCTs (1,003 incident lung cancers), the two
-aging axes behave very differently.
+Two aging axes can be read off the same screening CT. They are only weakly
+linked, and they relate to lung cancer in different ways.
 
-1. **Cardiac calcium is a robust, independent lung-cancer marker.** HR/SD 1.14
-   [1.08, 1.22], adjusted for age, sex and smoking status. The HR does not move
-   when thymic health (3% attenuation) or the radiologist's emphysema read
-   (1.5% [−6%, +10%]) is added, and it is identical after ComBat harmonization.
-   On held-out test it adds a small but consistent **+0.01 C-index** on top of
-   every baseline tried (clinical; clinical + emphysema), reaching test C 0.688
-   with clinical + emphysema + calcium.
-2. **Thymic health's lung-cancer association is mostly an age effect.**
-   Unadjusted HR/SD 0.90 (high vs low 0.77, same direction as the paper's
-   unadjusted 0.64). Adjusting for age alone takes it to 0.97 (n.s.). This is
-   consistent with the paper's weak fully adjusted result (P=0.036 in 25k).
-   TH adds no C-index.
-3. **But TH is biologically connected to the heart.** Lower TH goes with more
-   cardiac calcium (partial ρ −0.10) and much more pericardial fat (partial ρ
-   −0.32), with denser fat HU, with the radiologist's "significant CV
-   abnormality" flag (OR/SD 0.85) and with emphysema (OR 0.89). All of these
-   are adjusted for age, sex and smoking. Thymic fatty involution tracks
-   visceral (pericardial) adiposity and vascular aging. That fits TH predicting
-   CV death in the paper, but it doesn't translate into lung-cancer risk beyond
-   age.
-4. **Calcium and emphysema are orthogonal smoking phenotypes** (vascular vs
-   parenchymal, OR 0.99 for their association), and each adds to lung-cancer
-   risk. So calcium is not a proxy for emphysema-type damage. Whether it
-   proxies *pack-years* remains open (no pack-years in IDC-780).
+1. **Vascular axis: cardiac calcium is a robust, independent, general
+   lung-cancer risk marker.**
+   - HR/SD 1.14 [1.08, 1.22], adjusted for age, sex and smoking (case-cohort,
+     6,041 pts / 1,003 events). The effect is threshold-like: only the top
+     third of non-zero calcium carries risk (HR 1.36 vs none; trend p=0.001).
+   - It is stable over time (HR 1.15 in year 0–1 and 1.14 after year 1),
+     unchanged by flexible age modelling or scanner batch, and unaffected by
+     thymic health (3% attenuation) or radiologist-read emphysema (1.5%).
+     Calcium and emphysema are uncorrelated (OR 0.99): they are orthogonal
+     smoking phenotypes, vascular vs parenchymal.
+   - It is only weakly histology-specific (SQ/SC ÷ adeno 1.08 vs 1.74 for
+     current smoking), so it is not simply a stand-in for smoking dose.
+   - It adds a small, reproducible **+0.01 test C-index** on top of every
+     baseline (clinical 0.657 → 0.667; clinical + emphysema 0.678 → 0.688).
+2. **Immune axis: the published thymic-health score protects against
+   non-adenocarcinoma lung cancer only.**
+   - On the full NLST CT arm (25,031 / 1,030 events) we reproduce the paper's
+     unadjusted HR (0.649 vs 0.64).
+   - About half of that effect is age. The adjusted effect is real: 0.91/SD
+     (p=0.004), high vs low 0.81.
+   - It is **entirely non-adenocarcinoma**: squamous 0.80, small cell 0.89,
+     other 0.86, **adenocarcinoma 1.00 [0.91, 1.10]**. The Lunn–McNeil
+     interaction is 0.835 (p=0.019).
+   - Emphysema adjustment doesn't change it. In the case-cohort subset where
+     calcium is available, dose markers attenuate the SQ/SC effect by only 25%.
+   - The pattern has the same direction in 7/7 disjoint subsets. It isn't
+     shared by body-size comparators, and it isn't driven by indolent BAC
+     adenocarcinoma. It is stronger for advanced (0.91) than early (0.98)
+     cancers.
+   - Candidate mechanism: thymic output (naïve T-cell repertoire) constrains
+     the most mutagenized, neoantigen-rich tumours (squamous/small cell, the
+     smoking-signature cancers). This would also explain why the paper's LC
+     *mortality* HR is stronger than its incidence HR. A pack-years confounding
+     explanation can't be excluded without CDAS data. It would predict larger
+     attenuation by dose markers than the 25% observed.
+3. **The axes are connected through adiposity and vascular aging.**
+   - Lower thymic health goes with more cardiac calcium (partial ρ −0.10),
+     much more pericardial fat (ρ −0.32), denser fat HU (ρ +0.26),
+     radiologist CV abnormality (OR 0.85) and emphysema (OR 0.89).
+   - This replicates at n = 6k, with smoking adjustment, the only prior
+     thymus–CAC study (Walther 2026, n=206). The thymus–pericardial-fat link
+     appears to be new.
+   - The two axes **share about a quarter of the SQ/SC signal**. Otherwise
+     they are complementary: calcium is general, thymic health is histology
+     specific.
 
 ## Key Results
 
 | Result | Numbers | Where |
 |---|---|---|
-| TH → LC, adj age/sex/smoking | HR/SD 0.95 [0.89, 1.02]; high vs low 0.90 [0.75, 1.08] | E1 A1 |
-| TH → LC, unadjusted | HR/SD 0.90 [0.84, 0.95]; high vs low 0.77 [0.65, 0.92] | E1 explore |
-| TH ↔ calcium / pericardial fat (partial ρ) | −0.10 [−0.13, −0.08] / −0.32 [−0.35, −0.30] | E1 A2 |
-| Calcium → LC, joint with TH | HR/SD 1.14 [1.07, 1.21] | E1 A3 |
-| Low TH + top-quartile calcium vs neither | adj HR 1.48 [1.21, 1.80] | E1 2×2 |
-| Calcium attenuation by emphysema | 1.5% [−6%, +10%] | E2 B2 |
-| Test C: clin / +Ca / +emph / +emph+Ca | 0.657 / 0.667 / 0.678 / **0.688** | E1 A4, E2 B3 |
-| Calcium AUC for radiologist CV flag | 0.62 [0.59, 0.65]; OR/SD 1.40 | E2 B1 |
+| TH, paper replication (unadj 6-yr high vs low) | 0.649 [0.54, 0.78] (paper 0.64 [0.53, 0.76]) | E5 F1 |
+| TH adj age/sex/smoking, full CT arm | 0.908/SD [0.85, 0.97]; high vs low 0.81 [0.67, 0.97] | E5 F1 |
+| TH by histology (full) | adeno 1.00, SQ/SC 0.83 [0.75, 0.93], squamous 0.80; LM p=0.019 | E5 F2 |
+| TH ↔ calcium / pericardial fat (partial ρ) | −0.10 / −0.32 | E1 A2 |
+| Calcium adj HR/SD (with TH / with emphysema) | 1.14 / 1.14 | E1 A3, E2 B2 |
+| Calcium dose-response (T3 vs none) | 1.36 [1.09, 1.70], trend p=0.001 | E3 C3 |
+| Calcium histology ratio vs smoking control | 1.08 vs 1.74 | E3 C1 |
+| Test C: clin / +Ca / +emph / +emph+Ca | 0.657 / 0.667 / 0.678 / **0.688** | E1, E2 |
+| Test SQ/SC-specific C: clin → +TH | 0.720 → 0.733 (+0.013, p=0.056) | E4 D7 |
 
 ## Patterns and Insights
 
-- **Simple physical CT quantities survive and learned or high-order features
-  don't.** Calcium mass replicates everywhere. Texture didn't (R3). A deep TH
-  score is mostly age at this endpoint.
-- **Age is the dominant confounder for "aging" markers.** Any aging-axis score
-  must be evaluated *age-adjusted*. Unadjusted HRs mainly measure age.
-- **Additivity comes from orthogonal tissue compartments** (vascular calcium
-  vs lung parenchyma), not from two aging scores that share age and adiposity.
+- **Pooling histologies hides immune-axis signal.** A marker that protects
+  against one histology and is null for another looks weak in pooled
+  analyses. Lung-cancer biomarker studies should report histology-specific
+  HRs.
+- **Simple physical CT quantities survive; high-order features don't.**
+  Calcium mass replicates everywhere, texture didn't (R3). A deep TH score
+  works, but only for a biologically specific endpoint.
+- **Age is the dominant confounder of "aging" markers.** It halves TH's
+  log-HR. Always report age-adjusted estimates.
+- **Additivity comes from orthogonal compartments:** vascular calcium vs
+  parenchymal emphysema vs immune (thymus, histology-specific).
 
 ## Lessons and Constraints
 
-- Carried over from R0–R5: radiomic texture is kernel-dominated (leakage AUC
-  0.89 before ComBat). Calcium needs 0.7 mm smoothing on sharp kernels.
-  Enriched cohort means no calibration/Brier, rankings only. Stratify Cox by
-  split (enrichment differs by split).
+- **Case-cohort (enriched) sample ≠ full cohort.** The same events with ~5k
+  instead of ~24k controls, plus split strata, diluted TH (0.95 vs 0.91/SD).
+  Estimate HRs on the full cohort when the marker is available there; treat
+  enriched-sample HRs as approximate. Calcium currently exists only on the
+  enriched sample. A full-CT-arm extraction is a big sbatch (user runs it).
+- Carried over from R0–R5: radiomic texture is kernel-dominated. Calcium needs
+  0.7 mm smoothing on sharp kernels. There is no calibration/Brier on the
+  enriched cohort. Stratify Cox by split there.
 - Never enumerate `derived/totalseg_fullres/` (~55k folders).
-- `ctab` rows exist only for reported abnormalities. For a scanned participant
-  with no yr0 row, treat the flag as absent. Never adjust for nodule codes
-  (51/52/62) because they sit on the detection pathway.
-- Published TH is a within-NLST percentile (QC failures are dumped into
-  "low" and can't be identified). With 1,003 events the MDE for an adjusted
-  HR/SD is about 0.90, so a null here is "not large", not "zero".
-- ctab-60 is a poor CAC reference standard (heterogeneous flag). If a real CAC
-  reference is needed, use the DeepCAC2 NLST release (Nürnberg 2026) once it
-  is public.
+- `ctab`: no yr0 row means the flag is absent. Never adjust for nodule codes.
+  ctab-60 is a poor CAC reference (calcium AUC only 0.62).
+- TH is a uniform within-NLST percentile with no identifiable QC-failure mass.
+  It is scanner-robust (kernel leakage AUC 0.52, partial R² 1.8%).
 - statsmodels is not in the venv. `aging_data.logit` (IRLS) gives the ORs.
+- Multiplicity: the TH × histology lead came from 5 exploratory marker
+  deltas (p=0.009 vs Bonferroni 0.01). E4/E5 stress tests use the same events,
+  so this is robust but not independently replicated.
 
 ## Open Questions
 
-- Does calcium proxy pack-years? Indirect test: histology specificity
-  (squamous/small-cell are more dose-driven than adenocarcinoma) → E3.
-- Is the calcium association front-loaded in the first year (prevalent,
-  undiagnosed cancer) or stable (long-term risk)? → E3.
-- Is TH itself kernel/scanner-dependent (never harmonized by its authors)? → E3.
-- The 2×2 "both" group looks super-additive: real, or a cut-point artifact?
+- Pack-years (CDAS) would decide immune surveillance vs residual dose
+  confounding for TH × SQ/SC, and quantify how much of calcium is dose.
+- Calcium on the full CT arm (19k more scans; the big sbatch) would remove the
+  case-cohort approximation for calcium and allow a full-cohort TH + calcium
+  joint model.
+- External replication of TH × histology (e.g., FHS or other cohorts with TH
+  scores) is needed. TRACERx (in the paper) is NSCLC-only and could compare
+  adeno vs squamous immune markers.
+- Does TH predict squamous *stage* or aggressiveness among cases?
 
 ## Optimization Trajectory
 
-Test Harrell C (Cox fit on train+val, TH-complete test n=1,983, 149 events):
+Test Harrell C (Cox fit on train+val; TH-complete test n=1,983, 149 events):
 clinical 0.657 → +TH 0.658 → +calcium 0.667 → +emphysema 0.678 →
-**+emphysema+calcium 0.688**. TH never helps. Calcium gives +0.01 on every base.
+**+emphysema+calcium 0.688**. TH doesn't help pooled prediction but helps
+SQ/SC-specific prediction (+0.013).
