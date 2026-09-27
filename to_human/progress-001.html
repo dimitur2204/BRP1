@@ -107,20 +107,20 @@
 <div class="wrap">
 
   <header class="stack">
-    <p class="eyebrow">Research progress 001 · branch thymus-heart-aging · 27 Sep 2026</p>
+    <p class="eyebrow">Research progress · branch thymus-heart-aging · updated 27 Sep 2026 with E6</p>
     <h1>Thymus × Calcium in NLST</h1>
     <p class="prose" style="font-size:1.1rem;color:var(--ink-2)">Two aging axes read off the same baseline low-dose CT: immune aging (the published thymic-health score of Bernatz et al., <i>Nature</i> 2026) and vascular aging (our cardiac calcium burden). Do they predict lung cancer independently, or are both stand-ins for smoking?</p>
     <div class="meta">
-      <span>NLST T0 screens</span><span>case-cohort 6,041 pts / 1,003 cancers</span><span>full CT arm 25,031 pts / 1,030 cancers</span><span>5 experiments · 14 hypotheses</span>
+      <span>NLST T0 screens</span><span>case-cohort 6,041 pts</span><span>16k cohort 15,784 pts / 1,003 cancers</span><span>full CT arm 25,031 pts / 1,030 cancers</span><span>6 experiments · 17 hypotheses</span>
     </div>
   </header>
 
   <section class="answer" aria-labelledby="bl">
     <h2 id="bl">Bottom line</h2>
     <ol>
-      <li><span class="ca">Cardiac calcium</span> is a general, independent lung-cancer risk marker: HR <span class="num">1.14</span> per SD <span class="num">[1.08, 1.22]</span> after age, sex and smoking. It is unmoved by thymic health or the radiologist's emphysema read, stable across follow-up, and threshold-like. It adds a small but reproducible <span class="num">+0.01</span> test C-index to every baseline we tried.</li>
-      <li>The <span class="th">thymic-health score</span> reproduces the paper exactly (unadjusted high vs low HR <span class="num">0.649</span> vs published <span class="num">0.64</span>). After adjustment it protects <b>only against non-adenocarcinoma</b>: squamous + small cell HR <span class="num">0.83</span> per SD, adenocarcinoma <span class="num">1.00</span>, interaction <span class="num">p = 0.019</span>.</li>
-      <li>The two axes are linked but complementary. Lower thymic health goes with more calcium (partial ρ <span class="num">−0.10</span>) and much more pericardial fat (<span class="num">−0.32</span>). They share about a quarter of the squamous/small-cell signal.</li>
+      <li><span class="ca">Cardiac calcium</span> is a general, independent lung-cancer risk marker: HR <span class="num">1.14</span> per SD <span class="num">[1.08, 1.22]</span> after age, sex and smoking. It is unmoved by thymic health or the radiologist's emphysema read, stable across follow-up, and threshold-like. The same HR (<span class="num">1.14</span>) holds on the 16k cohort from your full-arm extraction.</li>
+      <li>The <span class="th">thymic-health score</span> reproduces the paper exactly (unadjusted high vs low HR <span class="num">0.649</span> vs published <span class="num">0.64</span>). After adjustment it protects <b>only against non-adenocarcinoma</b>: squamous + small cell HR <span class="num">0.83</span> per SD, adenocarcinoma <span class="num">1.00</span>, interaction <span class="num">p = 0.019</span>. It still holds after adjusting for emphysema, calcium and pericardial fat (<span class="num">0.86</span>, <span class="num">p = 0.009</span>).</li>
+      <li>The two axes are linked but complementary. Lower thymic health goes with more calcium (partial ρ <span class="num">−0.09</span>) and much more pericardial fat (<span class="num">−0.33</span>). Both add to prediction: the best test model (clinical + emphysema + calcium + thymic health) reaches C <span class="num">0.692</span>, <span class="num">+0.012 [+0.002, +0.023]</span> over clinical + emphysema.</li>
     </ol>
   </section>
 
@@ -134,7 +134,7 @@
     <div class="prose stack">
       <p>Pooled over histologies, thymic health's adjusted HR is <span class="num">0.91</span> per SD (<span class="num">p = 0.004</span>). Split by histology, that average hides a clean dichotomy: squamous <span class="num">0.80</span>, small cell <span class="num">0.89</span>, other/NOS <span class="num">0.86</span>, adenocarcinoma <span class="num">1.00 [0.91, 1.10]</span>. The Lunn–McNeil competing-risks interaction is <span class="num">0.835 [0.72, 0.97]</span>. It is unchanged by adjusting for emphysema.</p>
       <p>We stress-tested it before believing it (E4, locked protocol). The direction holds in all 7 disjoint subsets (train/val/test, men/women, current/former smokers). Body-size comparators (pericardial fat, heart volume) don't show it. It isn't driven by indolent BAC-type adenocarcinomas, and it is stronger for stage III–IV (<span class="num">0.91</span>) than stage I–II (<span class="num">0.98</span>) cancers.</p>
-      <p class="note">Candidate mechanism: thymic output (the naïve T-cell repertoire) matters most for the most mutagenized, neoantigen-rich tumours, the smoking-signature histologies. That would also explain why the paper's lung-cancer <i>mortality</i> HR (0.52) is stronger than its incidence HR (0.64). The alternative is residual pack-years confounding. It predicts that smoking-dose markers would absorb most of the effect, but they absorb about 25%. Deciding between the two needs pack-years from CDAS. The finding came from an exploratory comparison (p = 0.009 against a Bonferroni threshold of 0.01), and every later check used the same cancers. It is robust, but it has not been independently replicated.</p>
+      <p class="note">Candidate mechanism: thymic output (the naïve T-cell repertoire) matters most for the most mutagenized, neoantigen-rich tumours, the smoking-signature histologies. That would also explain why the paper's lung-cancer <i>mortality</i> HR (0.52) is stronger than its incidence HR (0.64). The alternative is residual pack-years confounding. It predicts that smoking-dose markers would absorb most of the effect. On the 16k cohort, emphysema + calcium + pericardial fat absorb only 11–18%. Deciding between the two needs pack-years from CDAS. The finding came from an exploratory comparison (p = 0.009 against a Bonferroni threshold of 0.01), and every later check used the same cancers. It is robust, but it has not been independently replicated.</p>
     </div>
   </section>
 
@@ -168,74 +168,24 @@
   </section>
 
   <section class="stack" aria-labelledby="f3">
-    <p class="eyebrow">Finding 3 · held-out test split, n = 1,983, 149 cancers</p>
-    <h2 id="f3">Prediction: calcium adds, thymic health doesn't (pooled)</h2>
+    <p class="eyebrow">Finding 3 · E6, 16k cohort, held-out test split n = 2,622, 149 cancers</p>
+    <h2 id="f3">Prediction: both CT aging markers add to the radiologist's read</h2>
     <div class="chart" role="img" aria-label="Test C-index by model with 95% bootstrap intervals">
-      <svg viewBox="0 0 740 330" xmlns="http://www.w3.org/2000/svg">
-        <g font-size="12" fill="var(--ink-2)">
-          <!-- x scale: 0.60 -> 230, 0.74 -> 690 ; px per 0.01 = 32.857 -->
-          <line x1="230" y1="20" x2="230" y2="290" stroke="var(--rule)"/>
-          <line x1="295.7" y1="20" x2="295.7" y2="290" stroke="var(--rule)"/>
-          <line x1="361.4" y1="20" x2="361.4" y2="290" stroke="var(--rule)"/>
-          <line x1="427.1" y1="20" x2="427.1" y2="290" stroke="var(--rule)"/>
-          <line x1="492.9" y1="20" x2="492.9" y2="290" stroke="var(--rule)"/>
-          <line x1="558.6" y1="20" x2="558.6" y2="290" stroke="var(--rule)"/>
-          <line x1="624.3" y1="20" x2="624.3" y2="290" stroke="var(--rule)"/>
-          <line x1="690" y1="20" x2="690" y2="290" stroke="var(--rule)"/>
-          <text x="230" y="310" text-anchor="middle">0.60</text>
-          <text x="295.7" y="310" text-anchor="middle">0.62</text>
-          <text x="361.4" y="310" text-anchor="middle">0.64</text>
-          <text x="427.1" y="310" text-anchor="middle">0.66</text>
-          <text x="492.9" y="310" text-anchor="middle">0.68</text>
-          <text x="558.6" y="310" text-anchor="middle">0.70</text>
-          <text x="624.3" y="310" text-anchor="middle">0.72</text>
-          <text x="690" y="310" text-anchor="middle">0.74</text>
-          <text x="460" y="326" text-anchor="middle" font-size="11" fill="var(--ink-3)">Harrell's C on held-out test (95% bootstrap CI, 1,000 resamples)</text>
-        </g>
-        <g font-size="13" fill="var(--ink)">
-          <text x="0" y="44">clinical (age, sex, smoking)</text>
-          <text x="0" y="82">+ thymic health</text>
-          <text x="0" y="120">+ calcium</text>
-          <text x="0" y="158">+ thymic health + calcium</text>
-          <text x="0" y="196">+ emphysema read</text>
-          <text x="0" y="234">+ emphysema + calcium</text>
-          <text x="0" y="272">+ emphysema + TH + calcium</text>
-        </g>
-        <g stroke-width="2.5" stroke-linecap="round">
-          <line x1="272.1" y1="40" x2="557.3" y2="40" stroke="var(--ink-3)"/>
-          <line x1="276.9" y1="78" x2="560.5" y2="78" stroke="var(--th)"/>
-          <line x1="306.7" y1="116" x2="580.1" y2="116" stroke="var(--ca)"/>
-          <line x1="300.0" y1="154" x2="574.2" y2="154" stroke="var(--ca)"/>
-          <line x1="349.7" y1="192" x2="617.5" y2="192" stroke="var(--ink-3)"/>
-          <line x1="385.3" y1="230" x2="647.0" y2="230" stroke="var(--ca)"/>
-          <line x1="371.7" y1="268" x2="636.9" y2="268" stroke="var(--ca)"/>
-        </g>
-        <g stroke="var(--surface)" stroke-width="2">
-          <circle cx="417.7" cy="40" r="6" fill="var(--ink-3)"><title>clinical: C 0.657 [0.613, 0.700]</title></circle>
-          <circle cx="421.7" cy="78" r="6" fill="var(--th)"><title>+ thymic health: C 0.658, ΔC +0.001</title></circle>
-          <circle cx="449.3" cy="116" r="6" fill="var(--ca)"><title>+ calcium: C 0.667, ΔC +0.010 [−0.002, +0.022]</title></circle>
-          <circle cx="443.6" cy="154" r="6" fill="var(--ca)"><title>+ TH + calcium: C 0.665, ΔC +0.008</title></circle>
-          <circle cx="485.8" cy="192" r="6" fill="var(--ink-3)"><title>+ emphysema: C 0.678, ΔC +0.021</title></circle>
-          <circle cx="518.7" cy="230" r="7" fill="var(--ca)"><title>+ emphysema + calcium: C 0.688, ΔC +0.031 [+0.005, +0.060]; +0.010 over emphysema</title></circle>
-          <circle cx="507.9" cy="268" r="6" fill="var(--ca)"><title>+ emphysema + TH + calcium: C 0.685</title></circle>
-        </g>
-        <g font-size="11.5" fill="var(--ink-2)" font-family="IBM Plex Mono, monospace">
-          <text x="738" y="44" text-anchor="end">0.657</text>
-          <text x="738" y="82" text-anchor="end">0.658</text>
-          <text x="738" y="120" text-anchor="end">0.667</text>
-          <text x="738" y="158" text-anchor="end">0.665</text>
-          <text x="738" y="196" text-anchor="end">0.678</text>
-          <text x="738" y="234" text-anchor="end" font-weight="500" fill="var(--ink)">0.688</text>
-          <text x="738" y="272" text-anchor="end">0.685</text>
-        </g>
+      <svg viewBox="0 0 740 245" xmlns="http://www.w3.org/2000/svg">
+        <g font-size="12" fill="var(--ink-2)"><line x1="230.0" y1="20" x2="230.0" y2="205" stroke="var(--rule)"/><line x1="295.7" y1="20" x2="295.7" y2="205" stroke="var(--rule)"/><line x1="361.4" y1="20" x2="361.4" y2="205" stroke="var(--rule)"/><line x1="427.1" y1="20" x2="427.1" y2="205" stroke="var(--rule)"/><line x1="492.9" y1="20" x2="492.9" y2="205" stroke="var(--rule)"/><line x1="558.6" y1="20" x2="558.6" y2="205" stroke="var(--rule)"/><line x1="624.3" y1="20" x2="624.3" y2="205" stroke="var(--rule)"/><line x1="690.0" y1="20" x2="690.0" y2="205" stroke="var(--rule)"/><text x="230.0" y="225" text-anchor="middle">0.60</text><text x="295.7" y="225" text-anchor="middle">0.62</text><text x="361.4" y="225" text-anchor="middle">0.64</text><text x="427.1" y="225" text-anchor="middle">0.66</text><text x="492.9" y="225" text-anchor="middle">0.68</text><text x="558.6" y="225" text-anchor="middle">0.70</text><text x="624.3" y="225" text-anchor="middle">0.72</text><text x="690.0" y="225" text-anchor="middle">0.74</text>
+          <text x="460" y="242" text-anchor="middle" font-size="11" fill="var(--ink-3)">Harrell's C on held-out test (95% bootstrap CI, 1,000 resamples)</text></g>
+        <g font-size="13" fill="var(--ink)"><text x="0" y="48">clinical (age, sex, smoking)</text><text x="0" y="94">+ emphysema read</text><text x="0" y="140">+ emphysema + calcium</text><text x="0" y="186">+ emphysema + calcium + thymic health</text></g>
+        <g stroke-width="2.5" stroke-linecap="round"><line x1="279.1" y1="44" x2="568.9" y2="44" stroke="var(--ink-3)"/><line x1="335.2" y1="90" x2="624.4" y2="90" stroke="var(--ink-3)"/><line x1="375.2" y1="136" x2="650.6" y2="136" stroke="var(--ca)"/><line x1="383.1" y1="182" x2="658.5" y2="182" stroke="var(--th)"/></g>
+        <g stroke="var(--surface)" stroke-width="2"><circle cx="426.0" cy="44" r="6" fill="var(--ink-3)"><title>clinical (age, sex, smoking): C 0.660 [0.615, 0.703]; ΔC vs clinical+emphysema -0.021 [-0.043, +0.002]</title></circle><circle cx="493.4" cy="90" r="6" fill="var(--ink-3)"><title>+ emphysema read: C 0.680 [0.632, 0.720]</title></circle><circle cx="523.0" cy="136" r="6" fill="var(--ca)"><title>+ emphysema + calcium: C 0.689 [0.644, 0.728]; ΔC vs clinical+emphysema +0.009 [+0.000, +0.019]</title></circle><circle cx="532.0" cy="182" r="7" fill="var(--th)"><title>+ emphysema + calcium + thymic health: C 0.692 [0.647, 0.730]; ΔC vs clinical+emphysema +0.012 [+0.002, +0.023]</title></circle></g>
+        <g font-size="11.5" fill="var(--ink-2)" font-family="IBM Plex Mono, monospace"><text x="738" y="48" text-anchor="end">0.660</text><text x="738" y="94" text-anchor="end">0.680</text><text x="738" y="140" text-anchor="end">0.689</text><text x="738" y="186" text-anchor="end" font-weight="500" fill="var(--ink)">0.692</text></g>
       </svg>
       <div class="legend">
         <span style="--c:var(--ink-3)">no imaging marker</span>
-        <span style="--c:var(--th)">thymic health</span>
-        <span style="--c:var(--ca)">includes calcium</span>
+        <span style="--c:var(--ca)">adds calcium</span>
+        <span style="--c:var(--th)">adds thymic health on top</span>
       </div>
     </div>
-    <p class="prose">Calcium gives <span class="num">+0.010</span> over clinical and <span class="num">+0.010 [+0.000, +0.020]</span> over clinical + emphysema. The same gain appeared in the earlier R5 run. Pooled thymic health adds nothing, but for <b>squamous/small-cell-specific</b> prediction it adds <span class="num">+0.013</span> (C 0.720 → 0.733, <span class="num">p = 0.056</span>, 58 events), while for adenocarcinoma it subtracts <span class="num">0.016</span>. That's the same dichotomy as Finding 1, seen on held-out patients. The cohort is case-enriched, so rankings are valid but absolute risks are not.</p>
+    <p class="prose">Models are fit on train + val and scored once on test. Calcium adds <span class="num">+0.009 [+0.000, +0.019]</span> over clinical + emphysema, and thymic health adds a further <span class="num">+0.003</span> (total <span class="num">+0.012 [+0.002, +0.023]</span>). On the smaller case-cohort (E1/E2) the calcium gain was the same (<span class="num">+0.010</span>), but pooled thymic health added nothing. Its value there showed only in <b>squamous/small-cell-specific</b> prediction (<span class="num">+0.013</span>, while adenocarcinoma got <span class="num">−0.016</span>), the same dichotomy as Finding 1. Both cohorts are case-enriched, so rankings are valid but absolute risks are not.</p>
   </section>
 
   <section class="stack" aria-labelledby="ledger">
@@ -259,16 +209,19 @@
           <tr><td class="id">H12</td><td>TH × histology survives stress tests</td><td class="num">LM p 0.010; 7/7 subsets; 25% shared</td><td><span class="chip ok">mostly</span></td></tr>
           <tr><td class="id">H13</td><td>Our TH join reproduces the paper</td><td class="num">0.649 vs 0.64</td><td><span class="chip ok">supported</span></td></tr>
           <tr><td class="id">H14</td><td>TH × histology holds on full CT arm</td><td class="num">interaction 0.835, p 0.019</td><td><span class="chip ok">supported</span></td></tr>
+          <tr><td class="id">H15</td><td>Calcium HR 1.08–1.25 on the 16k cohort</td><td class="num">1.138 [1.07, 1.21]</td><td><span class="chip ok">supported</span></td></tr>
+          <tr><td class="id">H16</td><td>Joint TH + calcium: both significant, &lt;15% attenuation each</td><td class="num">TH 0.93 (−29%), Ca 1.13 (−8%)</td><td><span class="chip mid">partial</span></td></tr>
+          <tr><td class="id">H17</td><td>TH × histology survives calcium adjustment (16k)</td><td class="num">SQ/SC 0.86, p 0.009; LM p 0.021</td><td><span class="chip ok">supported</span></td></tr>
         </tbody>
       </table>
     </div>
-    <p class="note">A lesson from H1 → H13: the mentor's enriched sample (all cases, about 5k controls, per-split sampling) diluted thymic health to 0.95 per SD. The full CT arm, with the same cancers and 24k controls, gives 0.91. Calcium currently exists only on the enriched sample, which is the main reason to run the extraction below.</p>
+    <p class="note">A lesson from H1 → H13: the mentor's enriched sample (all cases, about 5k controls, per-split sampling) diluted thymic health to 0.95 per SD. The full CT arm, with the same cancers and 24k controls, gives 0.91. Your full-arm extraction (job 832790, 9,861 scans) added calcium for the 16k cohort, and every calcium result held there.</p>
   </section>
 
   <section class="stack" aria-labelledby="next">
     <h2 id="next">Next, and what I need from you</h2>
     <ul class="plain prose">
-      <li><b>Full-CT-arm calcium extraction (big sbatch, you run it).</b> About 19k more baseline scans. It would put calcium and thymic health in one unsampled model, and remove the case-cohort caveat from Finding 2. I'll prepare the script and cohort file on this branch.</li>
+      <li><b>Done:</b> full-arm calcium extraction (your job 832790) → E6 on 15,784 participants. About 9k more scored scans have no TotalSegmentator mask yet (mentor's GPU job). They are almost all non-cases, so they are low priority.</li>
       <li><b>Pack-years via CDAS</b> (<code>docs/future_data_request_cdas.md</code>). This is the single dataset that decides immune surveillance vs residual smoking dose for Finding 1.</li>
       <li><b>Optional R6 controls</b> (lung positive / sternum negative radiomics) to validate the extraction pipeline itself.</li>
       <li>Then the write-up: <code>findings.md</code> already reads as a paper backbone. 28 verified references are in <code>literature/</code>.</li>
@@ -276,6 +229,6 @@
   </section>
 
   <footer>
-    Branch thymus-heart-aging · protocols locked before results (git: 2b68f4f, 88cbd65, 8f9b1a7, 9a3a50f) · code in experiments/E1–E5 · state in research-state.yaml, findings.md
+    Branch thymus-heart-aging · protocols locked before results (git: 2b68f4f, 88cbd65, 8f9b1a7, 9a3a50f, 9479c69) · code in experiments/E1–E6 · state in research-state.yaml, findings.md
   </footer>
 </div>

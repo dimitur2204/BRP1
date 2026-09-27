@@ -7,7 +7,7 @@ Do CT-derived markers of immune aging (thymic health, Bernatz et al. Nature
 additive information about lung-cancer incidence on NLST baseline low-dose CT,
 or do they proxy the same unmeasured smoking burden?
 
-## Current Understanding (after 5 experiments, 3 outer loops)
+## Current Understanding (after 6 experiments, 4 outer loops)
 
 Two aging axes can be read off the same screening CT. They are only weakly
 linked, and they relate to lung cancer in different ways.
@@ -26,6 +26,9 @@ linked, and they relate to lung cancer in different ways.
      current smoking), so it is not simply a stand-in for smoking dose.
    - It adds a small, reproducible **+0.01 test C-index** on top of every
      baseline (clinical 0.657 → 0.667; clinical + emphysema 0.678 → 0.688).
+   - **Confirmed on the less-sampled 16k cohort** (E6: all cancers + ~62% of
+     the other CT-arm participants): HR/SD 1.138 [1.07, 1.21], T3 vs none
+     1.33, unchanged by TH + emphysema (8% attenuation).
 2. **Immune axis: the published thymic-health score protects against
    non-adenocarcinoma lung cancer only.**
    - On the full NLST CT arm (25,031 / 1,030 events) we reproduce the paper's
@@ -35,8 +38,11 @@ linked, and they relate to lung cancer in different ways.
    - It is **entirely non-adenocarcinoma**: squamous 0.80, small cell 0.89,
      other 0.86, **adenocarcinoma 1.00 [0.91, 1.10]**. The Lunn–McNeil
      interaction is 0.835 (p=0.019).
-   - Emphysema adjustment doesn't change it. In the case-cohort subset where
-     calcium is available, dose markers attenuate the SQ/SC effect by only 25%.
+   - Emphysema adjustment doesn't change it. On the 16k cohort (E6), adjusting
+     for **emphysema + calcium + pericardial fat attenuates the SQ/SC effect by
+     only 11–18%**: 0.831 → 0.849–0.859, p < 0.01, with interaction p=0.021.
+     The ~5k-control case-cohort had shown 25% and p=0.08, a precision
+     problem that E6 resolved.
    - The pattern has the same direction in 7/7 disjoint subsets. It isn't
      shared by body-size comparators, and it isn't driven by indolent BAC
      adenocarcinoma. It is stronger for advanced (0.91) than early (0.98)
@@ -47,7 +53,12 @@ linked, and they relate to lung cancer in different ways.
      *mortality* HR is stronger than its incidence HR. A pack-years confounding
      explanation can't be excluded without CDAS data. It would predict larger
      attenuation by dose markers than the 25% observed.
-3. **The axes are connected through adiposity and vascular aging.**
+3. **Both markers add to prediction.** On the 16k cohort's held-out test
+   (2,622 / 149), clinical 0.660 → + emphysema 0.680 → + calcium 0.689 →
+   **+ TH 0.692** (+0.012 [+0.002, +0.023] over clinical + emphysema). In the
+   joint model both are independent: TH 0.93 (p=0.04), calcium 1.13
+   (p=1e-4).
+4. **The axes are connected through adiposity and vascular aging.**
    - Lower thymic health goes with more cardiac calcium (partial ρ −0.10),
      much more pericardial fat (ρ −0.32), denser fat HU (ρ +0.26),
      radiologist CV abnormality (OR 0.85) and emphysema (OR 0.89).
@@ -57,6 +68,7 @@ linked, and they relate to lung cancer in different ways.
    - The two axes **share about a quarter of the SQ/SC signal**. Otherwise
      they are complementary: calcium is general, thymic health is histology
      specific.
+     (On 16k: ρ(TH, calcium) −0.094, ρ(TH, fat) −0.332.)
 
 ## Key Results
 
@@ -71,6 +83,8 @@ linked, and they relate to lung cancer in different ways.
 | Calcium histology ratio vs smoking control | 1.08 vs 1.74 | E3 C1 |
 | Test C: clin / +Ca / +emph / +emph+Ca | 0.657 / 0.667 / 0.678 / **0.688** | E1, E2 |
 | Test SQ/SC-specific C: clin → +TH | 0.720 → 0.733 (+0.013, p=0.056) | E4 D7 |
+| 16k cohort: calcium HR/SD; TH × SQ/SC adj emph + Ca | 1.138 [1.07, 1.21]; 0.859 [0.77, 0.96], LM p=0.021 | E6 |
+| 16k test C: clin / +emph / +Ca / +TH | 0.660 / 0.680 / 0.689 / **0.692** | E6 G4 |
 
 ## Patterns and Insights
 
@@ -91,8 +105,10 @@ linked, and they relate to lung cancer in different ways.
 - **Case-cohort (enriched) sample ≠ full cohort.** The same events with ~5k
   instead of ~24k controls, plus split strata, diluted TH (0.95 vs 0.91/SD).
   Estimate HRs on the full cohort when the marker is available there; treat
-  enriched-sample HRs as approximate. Calcium currently exists only on the
-  enriched sample. A full-CT-arm extraction is a big sbatch (user runs it).
+  enriched-sample HRs as approximate. Calcium now also exists on the 16k
+  cohort (`heart_features_fullarm.csv`, cardiac-only R2, about 6 min/task × 40).
+- TotalSegmentator coverage in `derived/` = all cases + ~62% of controls, so
+  "has a mask" is itself a (mild) case-enrichment.
 - Carried over from R0–R5: radiomic texture is kernel-dominated. Calcium needs
   0.7 mm smoothing on sharp kernels. There is no calibration/Brier on the
   enriched cohort. Stratify Cox by split there.
@@ -110,9 +126,10 @@ linked, and they relate to lung cancer in different ways.
 
 - Pack-years (CDAS) would decide immune surveillance vs residual dose
   confounding for TH × SQ/SC, and quantify how much of calcium is dose.
-- Calcium on the full CT arm (19k more scans; the big sbatch) would remove the
-  case-cohort approximation for calcium and allow a full-cohort TH + calcium
-  joint model.
+- ~9k TH-scored CT-arm scans still lack TotalSegmentator masks (the mentor's
+  GPU job). They are almost all non-cases, so they would add precision but no
+  events. This is low priority now that the 16k cohort reproduces the full-arm
+  TH HR (0.909 vs 0.908).
 - External replication of TH × histology (e.g., FHS or other cohorts with TH
   scores) is needed. TRACERx (in the paper) is NSCLC-only and could compare
   adeno vs squamous immune markers.
@@ -122,5 +139,6 @@ linked, and they relate to lung cancer in different ways.
 
 Test Harrell C (Cox fit on train+val; TH-complete test n=1,983, 149 events):
 clinical 0.657 → +TH 0.658 → +calcium 0.667 → +emphysema 0.678 →
-**+emphysema+calcium 0.688**. TH doesn't help pooled prediction but helps
-SQ/SC-specific prediction (+0.013).
++emphysema+calcium 0.688. 16k cohort (test 2,622 / 149): clinical 0.660 →
++emphysema 0.680 → +calcium 0.689 → **+TH 0.692**. With more controls, TH
+adds on top of calcium. It also helps SQ/SC-specific prediction (+0.013).
