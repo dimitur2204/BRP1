@@ -1,0 +1,18 @@
+{
+  "cohort_n": 6205,
+  "cohort_events": 1018,
+  "th_missing_n": 164,
+  "th_missing_events": 15,
+  "analysis_n": 6041,
+  "analysis_events": 1003,
+  "atten_calc_z": {
+    "point": 0.014756813911000477,
+    "lo": -0.06218915432835991,
+    "hi": 0.10251910033588812
+  },
+  "atten_th_z": {
+    "point": 0.31042868312036753,
+    "lo": -1.698910804433139,
+    "hi": 3.7405991156510265
+  }
+}

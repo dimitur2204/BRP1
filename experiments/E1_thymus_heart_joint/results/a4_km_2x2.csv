@@ -1,0 +1,9 @@
+panel,group,n,events,cum_inc_6y
+Full cohort (strata-free KM),neither,3528,514,0.13949798029061933
+Full cohort (strata-free KM),low TH only,1003,168,0.167622810523805
+Full cohort (strata-free KM),high calcium only,935,190,0.19711552383348596
+Full cohort (strata-free KM),low TH + high calcium,575,131,0.22582042109659695
+Held-out test split,neither,1137,62,0.05085510083633016
+Held-out test split,low TH only,332,28,0.08506566890209966
+Held-out test split,high calcium only,312,29,0.08975856157416051
+Held-out test split,low TH + high calcium,202,30,0.15222462208565457

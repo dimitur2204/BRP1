@@ -1,0 +1,43 @@
+{'cohort_n': 6205, 'cohort_events': 1018, 'th_missing_n': 164, 'th_missing_events': 15, 'analysis_n': 6041, 'analysis_events': 1003}
+                                analysis      var    coef      se      hr      lo      hi       p     n  events
+0                  TH per SD, unadjusted     th_z -0.1105  0.0321  0.8954  0.8407  0.9536  0.0006  6041    1003
+1         TH per SD, adj age/sex/smoking     th_z -0.0508  0.0339  0.9505  0.8893  1.0158  0.1344  6041    1003
+2                 TH average vs low, adj   th_avg -0.1183  0.0735  0.8885  0.7693  1.0261  0.1076  6041    1003
+3                    TH high vs low, adj  th_high -0.1063  0.0939  0.8991  0.7479  1.0809  0.2577  6041    1003
+4       TH per SD, adj, censored at 6 yr     th_z -0.0561  0.0349  0.9454  0.8829  1.0124  0.1081  6041     947
+5  TH high vs low, adj, censored at 6 yr  th_high -0.1237  0.0968  0.8837  0.7309  1.0684  0.2016  6041     947
+6   TH per SD, strata split x sex x age5     th_z -0.0634  0.0340  0.9385  0.8780  1.0032  0.0622  6041    1003 
+Schoenfeld p (TH): 0.22338077294353614
+          x                     y          kind  raw_rho  partial_rho      lo      hi
+0    th_pct              log_calc  confirmatory  -0.1856      -0.1004 -0.1251 -0.0754
+1    th_pct    card_fat_volume_ml  confirmatory  -0.3965      -0.3228 -0.3479 -0.2989
+2  log_calc    card_fat_volume_ml   exploratory   0.0488      -0.0774 -0.1028 -0.0515
+3    th_pct  card_heart_volume_ml   exploratory  -0.1998      -0.0449 -0.0702 -0.0181
+4    th_pct      card_fat_mean_hu   exploratory   0.2876       0.2635  0.2394  0.2867
+                             model            var    coef      se      hr      lo      hi       p
+0                    clinical + TH           th_z -0.0508  0.0339  0.9505  0.8893  1.0158  0.1344
+1               clinical + calcium         calc_z  0.1346  0.0318  1.1441  1.0750  1.2176  0.0000
+2          clinical + TH + calcium           th_z -0.0313  0.0341  0.9692  0.9065  1.0362  0.3589
+3          clinical + TH + calcium         calc_z  0.1303  0.0321  1.1391  1.0697  1.2131  0.0000
+4             joint + TH x calcium      th_x_calc  0.0205  0.0309  1.0207  0.9606  1.0845  0.5086
+5  clinical + TH + calcium(ComBat)           th_z -0.0365  0.0339  0.9642  0.9022  1.0305  0.2827
+6  clinical + TH + calcium(ComBat)  calc_combat_z  0.1285  0.0334  1.1371  1.0650  1.2141  0.0001 
+ {'atten_th': 0.3838, 'atten_calc': 0.0322, 'interaction_p': 0.5086, 'lr_test_joint_vs_th': 8.0509, 'lr_test_joint_vs_calc': 0.421, 'aic_clinical': 14712.7485, 'aic_clinical+TH': 14712.509, 'aic_clinical+calcium': 14697.2492, 'aic_clinical+TH+calcium': 14698.4072}
+                 model       c    c_lo    c_hi  dc_vs_clinical   dc_lo   dc_hi   dc_p  dc_vs_clinical+calcium  dc2_lo  dc2_hi  dc2_p  test_n  test_events
+0             clinical  0.6571  0.6128  0.6996          0.0000  0.0000  0.0000    NaN                 -0.0096 -0.0219  0.0022  0.114    1983          149
+1          clinical+TH  0.6584  0.6143  0.7006          0.0012  0.0003  0.0022  0.008                 -0.0084 -0.0203  0.0032  0.168    1983          149
+2     clinical+calcium  0.6668  0.6233  0.7065          0.0096 -0.0022  0.0219  0.114                  0.0000  0.0000  0.0000    NaN    1983          149
+3  clinical+TH+calcium  0.6650  0.6213  0.7048          0.0079 -0.0039  0.0202  0.194                 -0.0018 -0.0031 -0.0005  0.002    1983          149
+                          panel                  group     n  events  cum_inc_6y
+0  Full cohort (strata-free KM)                neither  3528     514      0.1395
+1  Full cohort (strata-free KM)            low TH only  1003     168      0.1676
+2  Full cohort (strata-free KM)      high calcium only   935     190      0.1971
+3  Full cohort (strata-free KM)  low TH + high calcium   575     131      0.2258
+4           Held-out test split                neither  1137      62      0.0509
+5           Held-out test split            low TH only   332      28      0.0851
+6           Held-out test split      high calcium only   312      29      0.0898
+7           Held-out test split  low TH + high calcium   202      30      0.1522 
+                    group                    var    coef      se      hr      lo      hi       p     n  events
+0            low TH only            low TH only  0.0390  0.0895  1.0398  0.8725  1.2391  0.6626  1003     168
+1      high calcium only      high calcium only  0.2222  0.0864  1.2488  1.0543  1.4792  0.0101   935     190
+2  low TH + high calcium  low TH + high calcium  0.3910  0.1006  1.4785  1.2139  1.8007  0.0001   575     131

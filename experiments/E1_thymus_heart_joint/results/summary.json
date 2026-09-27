@@ -1,0 +1,19 @@
+{
+  "cohort_n": 6205,
+  "cohort_events": 1018,
+  "th_missing_n": 164,
+  "th_missing_events": 15,
+  "analysis_n": 6041,
+  "analysis_events": 1003,
+  "atten_th": 0.38377247470723086,
+  "atten_calc": 0.032188564530822084,
+  "interaction_p": 0.5086226627735211,
+  "lr_test_joint_vs_th": 8.050891190226139,
+  "lr_test_joint_vs_calc": 0.42095587409949076,
+  "aic_clinical": 14712.748500179056,
+  "aic_clinical+TH": 14712.509026649272,
+  "aic_clinical+calcium": 14697.249156017018,
+  "aic_clinical+TH+calcium": 14698.40724426882,
+  "schoenfeld_p_th": 0.22338077294353614,
+  "calc_q75_log": 2.7596913321230008
+}

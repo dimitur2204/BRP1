@@ -41,46 +41,58 @@ literature:
 hypotheses:
   - id: H1
     statement: "Published thymic health (TH) is inversely associated with lung-cancer incidence in our cohort beyond age/sex/smoking (high vs low HR in [0.5, 0.85], p<0.05)"
-    status: pending
+    status: refuted   # adj HR/SD 0.95 [0.89,1.02]; high vs low 0.90; signal absorbed by age (E1)
     priority: high
     parent: null
   - id: H2
     statement: "Lower TH is associated with more cardiac calcium and more pericardial fat, adjusted for age/sex/smoking (partial rho(TH, calcium) in [-0.15,-0.02]; rho(TH, fat) negative, |rho|>0.1)"
-    status: pending
+    status: supported # partial rho TH-calcium -0.10, TH-fat -0.32 (E1)
     priority: high
     parent: null
   - id: H3
     statement: "TH and calcium are independent: in a joint Cox both stay p<0.05 and each log-HR attenuates <15% vs single-marker models"
-    status: pending
+    status: refuted   # calcium independent of TH (3% atten) but TH n.s. (E1)
     priority: high
     parent: null
   - id: H4
     statement: "Clinical+TH+calcium beats clinical on held-out test (dC CI excludes 0) and beats clinical+calcium (point estimate)"
-    status: pending
+    status: refuted   # dC +0.008 [-0.004,0.020]; TH adds -0.002 over clin+Ca (E1)
     priority: high
     parent: null
   - id: H5
     statement: "Smoking-burden proxy test: adjusting for radiologist-read emphysema attenuates the calcium log-HR >=25% (proxy) vs <10% (independent)"
-    status: pending
+    status: supported # "independent": calcium atten by emphysema 1.5% [-6,10]% (E2)
     priority: medium
     parent: null
   - id: H6
     statement: "Validity: calcium proxy discriminates radiologist 'significant CV abnormality' (ctab 60, yr0) with AUC >= 0.75; TH is inversely associated with ctab 60"
-    status: pending
+    status: partial   # calcium AUC ctab60 0.62 (<0.75) but OR 1.40; TH OR 0.85 (E2)
     priority: medium
     parent: null
 
 experiments:
   proxy_metric: "Held-out test Harrell's C (n=2,040-ish, ~150 events) of Cox models fit on train+val; primary association metric = adjusted HR per SD on the full cohort (stratified by split)"
-  baseline_value: 0.647          # clinical Cox, R5
-  best_value: 0.662              # Cox-EN heart+clinical, R5
-  total_runs: 0
-  trajectory: []
+  baseline_value: 0.657          # clinical Cox on TH-complete test (R5 full test: 0.647)
+  best_value: 0.688              # clinical + emphysema + calcium (E2)
+  total_runs: 8
+  trajectory:   # test Harrell C, TH-complete test split n=1,983 / 149 events
+    - {run_id: E1-clin, hypothesis: H4, metric_value: 0.657, delta: 0.000, change_summary: "clinical Cox (age, sex, smoking)"}
+    - {run_id: E1-TH, hypothesis: H4, metric_value: 0.658, delta: 0.001, change_summary: "+ thymic health"}
+    - {run_id: E1-Ca, hypothesis: H4, metric_value: 0.667, delta: 0.010, change_summary: "+ cardiac calcium"}
+    - {run_id: E1-TH-Ca, hypothesis: H4, metric_value: 0.665, delta: 0.008, change_summary: "+ TH + calcium"}
+    - {run_id: E2-emph, hypothesis: H5, metric_value: 0.678, delta: 0.021, change_summary: "+ radiologist emphysema read"}
+    - {run_id: E2-emph-Ca, hypothesis: H5, metric_value: 0.688, delta: 0.031, change_summary: "+ emphysema + calcium"}
+    - {run_id: E2-emph-TH-Ca, hypothesis: H5, metric_value: 0.685, delta: 0.028, change_summary: "+ emphysema + TH + calcium"}
 
 outer_loop:
-  cycle: 0
-  last_direction: null
-  last_reflection: ""
+  cycle: 1
+  last_direction: deepen
+  last_reflection: >
+    Calcium is robust, independent of TH and emphysema, +0.01 C on every base.
+    TH-LC association is mostly age; TH is linked to cardiac fat/calcium/CV flags.
+    Next (E3): calcium mechanism -- histology specificity (indirect pack-years
+    test), time-varying HR (reverse causation), dose-response categories,
+    flexible age; TH kernel robustness.
 
 pending_human_actions:
   - "Optional sbatch (R6 controls: lungs/sternum radiomics) — deferred until needed"
