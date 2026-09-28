@@ -59,6 +59,4 @@ difference between them is and *why* it exists. Explain every design choice
 
 ## Open items
 
-- Gitignored legacy data for the 5 dropped organs (`data/organ_crops/*`,
-  `models/*_cnn3d.pt`, `data/saliency/anterior_mediastinum`) is still on disk.
-  Ask the user before deleting.
+- None besides the pending Slurm runs.

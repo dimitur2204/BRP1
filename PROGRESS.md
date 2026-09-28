@@ -74,5 +74,11 @@ too early (no C2 runs yet) and got a KeyError; C4 now exits with a clear
 message when no runs exist, and doc §8 no longer suggests running it before
 training.
 
+**Cleanup (user-approved):** deleted the gitignored legacy data for the 5
+dropped organs: `data/organ_crops/{anterior_mediastinum,aorta,heart,liver,spleen}`
+(~5.2 GB), their `models/*_cnn3d.pt`, and `data/saliency/anterior_mediastinum`.
+The lungs/sternum legacy crops and checkpoints are kept (C4 re-scores the old
+checkpoints).
+
 **Next:** user submits C1 → merge/QC → C2 grid → C3 → C2 final → C4 → C5.
 Then fill doc section 9 and publish the web page.
