@@ -222,6 +222,9 @@ def main() -> None:
 
     groups = load_groups(Path(args.runs_dir))
     print("groups found:", sorted(groups))
+    if not groups:
+        raise SystemExit(f"No finished C2 runs under {args.runs_dir} -- run the C2 grid and final "
+                         "sets first (see src/submit_c2_train.sh), then re-run c4_evaluate.py.")
     ens = {k: ensemble(v["preds"]) for k, v in groups.items()}
     train_ref = cohort[cohort.split == "train"]  # censoring distribution for Uno C / td-AUC
 

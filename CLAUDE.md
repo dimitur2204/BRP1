@@ -20,11 +20,10 @@ is in git history (commit `eb3b89b`).
 - Never enumerate/`ls`/`find` the full `derived/totalseg_fullres/` tree
   (~55k folders) — only ever look up specific `{pid}_yr0` paths by name.
 - Clinical CSVs (`meta/nlst_780/*.csv`: age, sex, smoking) are owner-only
-  (`mer`). Don't work around this. The public TCIA IDC-780 package into
-  `data/external/` is the intended source, but downloading it needs the
-  user's explicit go-ahead (command in `docs/cnn3d_explained.md` §8). Until
-  then `cnn_cohort_v1.csv` has empty clinical columns and C4 skips the
-  clinical adjustment. `nlst.csv` is IDC series metadata only; its
+  (`mer`). Don't work around this. The source is the public TCIA IDC-780
+  package the user downloaded into `data/external/` (gitignored;
+  regeneration command in `docs/cnn3d_explained.md` §8). `c0_build_cohort.py`
+  merges it into `cnn_cohort_v1.csv`. `nlst.csv` is IDC series metadata only; its
   `SeriesDescription` encodes kernel, kVp, mA, slice thickness.
 - `src/organs.py` — label map (lungs = lobes 10–14, sternum = 116), HU
   windows (`WINDOW`, and `LEGACY_WINDOW` for reproducing the old model),

@@ -45,7 +45,7 @@ drops to 0.50 after adjusting for age" is a finding.
 | `derived/totalseg_fullres/{pid}_yr0/seg.nii.gz` | TotalSegmentator 117-label segmentation on the same grid | Organ masks: **lungs** = union of the 5 lobe labels (10–14); **sternum** = label 116 |
 | `experiments/lcrisk_discovery/data/manifest.csv` | Per baseline scan: `time` (days from the T0 scan to lung-cancer diagnosis, or to last cancer-free follow-up), `event` (1 = diagnosed), `split` (the mentor's train/val/test), `kernel`, `kvp` | Outcome and split. Reused as-is and not re-derived. Its `label` column is **identical** to `event` (checked in C0) |
 | `nlst.csv` (IDC series metadata) | `SeriesDescription`, a comma-coded acquisition string: study year, vendor, kernel, FOV, slice thickness, kVp, mA | Scanner / kernel covariates, and dropping non-baseline series |
-| IDC-780 `prsn` table (TCIA public package) | Age, gender, race, `cigsmok` (current vs former smoker) | Clinical adjustment (section 8). *Not available in this checkout* (see "Clinical covariates" below) |
+| IDC-780 `prsn` table (TCIA public package, in `data/external/`) | Age, gender, race, `cigsmok` (current vs former smoker) | Clinical adjustment (section 8). Complete for all 6,306 patients |
 
 **Not available at all:** pack-years, smoking duration, death/cause of death,
 BMI, comorbidities (these would need a CDAS data request). No never-smokers are
@@ -85,7 +85,11 @@ exclusions as the heart-radiomics project (`cnn_cohort_v1_attrition.csv`):
 | enriched ∩ manifest | 6,373 | 1,061 | 2,080 / 160 |
 | series really is the baseline scan (study year 0)¹ | 6,359 | 1,047 | 2,079 / 159 |
 | has CT + TotalSegmentator mask | 6,359 | 1,047 | 2,079 / 159 |
-| CT covers ≥ 80 slices (drops partial scans) | **6,306** | **1,037** | **2,067 / 157** |
+| CT covers ≥ 80 slices (drops partial scans) | 6,306 | 1,037 | 2,067 / 157 |
+| has age / sex / smoking status | **6,306** | **1,037** | **2,067 / 157** |
+
+The manifest's cancer flag agrees with the clinical table's diagnosis date
+for every patient (0 disagreements).
 
 ¹ For 14 patients, all cancer cases, the manifest's "baseline" series was
 actually a T1/T2 scan. They are excluded because that image isn't a baseline.
@@ -350,12 +354,10 @@ image only, so its score means "what the image says". C4 then:
   Perc15, sternum HU and volume, plus kernel. That is what C4 does now
   (section 9).
 
-### Clinical covariates: current status
-The age/sex/smoking table (`prsn`) is not in this checkout. The mentor's copy
-under `meta/nlst_780/` is owner-only. The heart-radiomics branch used the
-public TCIA IDC-780 package (CC BY 4.0). Downloading it was not done
-automatically in this session, and it needs your go-ahead. To enable the
-clinical analyses:
+### Clinical covariates: source
+The age/sex/smoking table (`prsn`) comes from the public TCIA IDC-780 package
+(CC BY 4.0), downloaded into `data/external/` (gitignored). The mentor's copy
+under `meta/nlst_780/` is owner-only. Regenerate with:
 
 ```bash
 mkdir -p data/external/nlst_780 && cd data/external/nlst_780 && curl -sSLO \
@@ -364,11 +366,10 @@ mkdir -p data/external/nlst_780 && cd data/external/nlst_780 && curl -sSLO \
   && unzip -q nlst780.idc.delivery.052821.zip && for z in *.csv.zip; do unzip -q "$z"; done
 cd /faststorage/project/aura_thymus/student_pipeline
 env/.venv/bin/python src/c0_build_cohort.py      # fills age/sex/race/cigsmok
-env/.venv/bin/python src/c4_evaluate.py          # clinical analyses switch on automatically
 ```
 
-Neither the cohort nor the CNN changes: on the radiomics branch, the "has
-age/sex/smoking" step dropped nobody.
+`c4_evaluate.py` switches the clinical analyses on automatically when these
+columns are filled. It only runs after the C2 training runs exist.
 
 ---
 

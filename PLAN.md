@@ -42,8 +42,8 @@ difference between them is and *why* it exists. Explain every design choice
 
 - **C0 — cohort** ✅ `src/c0_build_cohort.py` → `data/pid_lists/cnn_cohort_v1{,_attrition,_sampling}.csv`.
   6,306 / 1,037 events, pid-identical to heart_cohort_v1. Clinical columns
-  are empty until the TCIA prsn file is present (download not authorized in
-  session; see the doc section 8).
+  are complete (the user downloaded the TCIA prsn package; the "has
+  age/sex/smoking" step dropped nobody).
 - **C1 — input cache** ✅ code, smoke-tested (legacy path matches the old
   cache to within 2.4e-4). ⬜ **user: `sbatch src/submit_c1_cache.sh`**, then
   `--merge` and `--qc`.
@@ -59,9 +59,6 @@ difference between them is and *why* it exists. Explain every design choice
 
 ## Open items
 
-- Clinical covariates (age/sex/cigsmok) need the public TCIA IDC-780
-  package. The user must run or approve the download (command in doc section 8).
-  Until then, C4 adjusts for kernel and image covariates only.
 - Gitignored legacy data for the 5 dropped organs (`data/organ_crops/*`,
   `models/*_cnn3d.pt`, `data/saliency/anterior_mediastinum`) is still on disk.
   Ask the user before deleting.

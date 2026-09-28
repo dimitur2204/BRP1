@@ -66,5 +66,13 @@ unaffected (that exclusion step removed nobody on the radiomics branch).
   padding, so this column is the check that the real model looks *inside*
   the organ rather than at its outline/size.
 
+**Clinical data (same day):** the user downloaded the TCIA IDC-780 package
+into `data/external/` and re-ran C0. Age/sex/race/cigsmok are 100% complete,
+"has age/sex/smoking" dropped 0 pts, and manifest event vs prsn `candx_days`
+disagree for 0 pids. C4's clinical adjustment is now active. The user ran C4
+too early (no C2 runs yet) and got a KeyError; C4 now exits with a clear
+message when no runs exist, and doc §8 no longer suggests running it before
+training.
+
 **Next:** user submits C1 → merge/QC → C2 grid → C3 → C2 final → C4 → C5.
 Then fill doc section 9 and publish the web page.
