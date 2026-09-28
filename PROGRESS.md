@@ -53,6 +53,18 @@ unaffected (that exclusion step removed nobody on the radiomics branch).
   scale/subset, score_old, and final (main/bce/lc/null). Each writes
   config/history/pred/curves/model/result.
 - The grid is 34 runs in 12 array tasks; final is 46 runs in 16 tasks.
+- `c4_evaluate.py` smoke test (scratch runs, `--out-dir`) runs end to end:
+  metrics table, paired ΔC, lead-time/kernel strata, score correlations,
+  adjusted HRs, reference models, KM, learning curve, headline figure.
+  - Fixed: C-index/AUC now return NaN on strata with no comparable pairs
+    (e.g. sharp kernel with no events). Previously this crashed.
+  - The runtime is dominated by imports and bootstraps (≈10 min on the login
+    node at n-boot 20; plan for longer at 1,000).
+- `c5_gradcam.py` smoke test: the NIfTI shape and affine equal the canonical
+  CT's. Added `cam_frac_in_mask` per patient (share of CAM mass inside the
+  organ mask). It is 0–2% for the 2-epoch smoke model, whose CAM sits in the
+  padding, so this column is the check that the real model looks *inside*
+  the organ rather than at its outline/size.
 
 **Next:** user submits C1 → merge/QC → C2 grid → C3 → C2 final → C4 → C5.
 Then fill doc section 9 and publish the web page.

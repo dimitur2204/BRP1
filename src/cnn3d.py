@@ -88,9 +88,13 @@ def cox_ph_loss(eta: torch.Tensor, time: torch.Tensor, event: torch.Tensor) -> t
 
 def harrell_c(time, eta, event) -> float:
     """Harrell's C: fraction of comparable pairs (the earlier time is an event)
-    in which the earlier-cancer patient has the higher eta. 0.5 = chance."""
+    in which the earlier-cancer patient has the higher eta. 0.5 = chance.
+    NaN if the subset has no comparable pair (e.g. a stratum without events)."""
     from lifelines.utils import concordance_index
-    return float(concordance_index(np.asarray(time), -np.asarray(eta), np.asarray(event)))
+    try:
+        return float(concordance_index(np.asarray(time), -np.asarray(eta), np.asarray(event)))
+    except ZeroDivisionError:
+        return float("nan")
 
 
 def load_organ(organ: str, recipe: str, cache_dir: Path = CACHE_DIR, mmap: bool = True):

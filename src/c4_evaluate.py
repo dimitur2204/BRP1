@@ -115,6 +115,11 @@ def ensemble(preds: list[pd.DataFrame]) -> pd.DataFrame:
 
 # ── metrics ──────────────────────────────────────────────────────────────────
 
+def safe_auc(y, s) -> float:
+    y = np.asarray(y)
+    return float(roc_auc_score(y, s)) if 0 < y.sum() < len(y) else float("nan")
+
+
 def surv(df):
     return Surv.from_arrays(df["event"].astype(bool).values, df["time"].values)
 
@@ -150,7 +155,7 @@ def all_metrics(ens: pd.DataFrame, train_ref: pd.DataFrame, n_boot: int) -> dict
         out.update({f"td_auc_{y}y": a for y, a in zip(TD_YEARS, aucs)})
     except ValueError:
         out.update({f"td_auc_{y}y": np.nan for y in TD_YEARS})
-    out["binary_auc"] = roc_auc_score(te["event"], te["score"])
+    out["binary_auc"] = safe_auc(te["event"], te["score"])
     for s in ("train", "val"):
         d = ens[ens["split"] == s]
         out[f"{s}_c"] = harrell_c(d["time"], d["score"], d["event"])
@@ -201,7 +206,12 @@ def main() -> None:
     ap.add_argument("--n-boot", type=int, default=1000)
     ap.add_argument("--runs-dir", default=str(RUNS_DIR))
     ap.add_argument("--cache-dir", default=str(CACHE_DIR))
+    ap.add_argument("--out-dir", default="", help="write data/ and figs/ outputs under this dir (smoke tests)")
     args = ap.parse_args()
+    global DATA_OUT, FIG_OUT
+    if args.out_dir:
+        DATA_OUT, FIG_OUT = Path(args.out_dir) / "data", Path(args.out_dir) / "figs"
+        DATA_OUT.mkdir(parents=True, exist_ok=True)
 
     cohort = pd.read_csv(COHORT_CSV, dtype={"pid": str})
     clin_ok = cohort[["age", "sex", "cigsmok"]].notna().all(axis=1).all()
@@ -233,7 +243,7 @@ def main() -> None:
             c, lo, hi = c_with_ci(te, "score", args.n_boot)
             rows.append({"organ": organ, "group": "old_ckpt@old_test", "n_seeds": 1, "train_n": 179,
                          "test_n": len(te), "test_events": int(te.event.sum()), "harrell_c": c,
-                         "c_lo": lo, "c_hi": hi, "binary_auc": roc_auc_score(te.event, te.score)})
+                         "c_lo": lo, "c_hi": hi, "binary_auc": safe_auc(te.event, te.score)})
     met = pd.DataFrame(rows)
     met["order"] = met["group"].map({g: i for i, g in enumerate(GROUP_ORDER)}).fillna(-1)
     met = met.sort_values(["organ", "order"]).drop(columns="order")
@@ -273,7 +283,7 @@ def main() -> None:
             late = te[te.time > 365.25]
             why_rows.append({"organ": organ, "group": g, "analysis": "events <= 1y vs all controls (binary AUC)",
                              "n": len(early), "events": int(early.event.sum()),
-                             "value": roc_auc_score(early.event, early.score)})
+                             "value": safe_auc(early.event, early.score)})
             why_rows.append({"organ": organ, "group": g, "analysis": "1-y landmark (time > 1y) Harrell C",
                              "n": len(late), "events": int(late.event.sum()),
                              "value": harrell_c(late.time, late.score, late.event)})
@@ -380,7 +390,7 @@ def main() -> None:
         ax.axhline(0.5, color="k", lw=0.7, ls=":")
         ax.set_xscale("log")
         ax.set_xlabel("training patients (log scale)")
-        ax.set_ylabel("test Harrell C (2,0xx pts)")
+        ax.set_ylabel("test Harrell C (full test set)")
         ax.set_title("Learning curve: does more data help?")
         ax.legend(fontsize=7)
         fig.tight_layout()

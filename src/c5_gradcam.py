@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 import matplotlib
@@ -36,7 +37,7 @@ import pandas as pd
 import torch
 import torch.nn.functional as F
 
-from cnn3d import CNN3D, load_organ, to_input, CACHE_DIR, RUNS_DIR, PROJECT
+from cnn3d import CNN3D, load_organ, to_input, CACHE_DIR, RUNS_DIR, PROJECT, SENTINEL
 from organs import WINDOW, load_patient
 
 SAL_DIR = PROJECT / "data" / "saliency"
@@ -60,9 +61,13 @@ class GradCAM3D:
         return (cam / (cam.max() + 1e-8)).cpu().numpy(), float(eta.item())
 
 
-def to_ct_space(cam: np.ndarray, row: pd.Series, in_shape, ct_shape) -> np.ndarray:
+def cam_on_input(cam: np.ndarray, in_shape) -> np.ndarray:
     t = torch.from_numpy(cam)[None, None].float()
-    t = F.interpolate(t, size=tuple(in_shape), mode="trilinear", align_corners=False)[0, 0].numpy()
+    return F.interpolate(t, size=tuple(in_shape), mode="trilinear", align_corners=False)[0, 0].numpy()
+
+
+def to_ct_space(t: np.ndarray, row: pd.Series, in_shape, ct_shape) -> np.ndarray:
+    """t: CAM already on the model-input grid (cam_on_input)."""
     res = np.zeros([int(row[f"res_{a}"]) for a in "xyz"], np.float32)
     src, dst = [], []
     for d, a in enumerate("xyz"):
@@ -147,10 +152,15 @@ def main() -> None:
         for _, p in picks.iterrows():
             i = int(np.where(idx.pid == p.pid)[0][0])
             row = idx.iloc[i]
-            x = to_input(torch.from_numpy(np.asarray(arr[i:i + 1])).to(device), organ, "iso")
+            x = to_input(torch.from_numpy(np.array(arr[i:i + 1])).to(device), organ, "iso")
             cam, eta = cam_fn(x)
             ct, _, _, ct_img = load_patient(p.pid)
-            full = to_ct_space(cam, row, arr.shape[1:], ct.shape)
+            cam_in = cam_on_input(cam, arr.shape[1:])
+            # share of CAM mass inside the organ mask: ~1 = the model looks inside the
+            # organ; low = it keys on the organ's outline/size or on padding
+            inside = np.asarray(arr[i]) != SENTINEL
+            frac_in = float(cam_in[inside].sum() / max(cam_in.sum(), 1e-8))
+            full = to_ct_space(cam_in, row, arr.shape[1:], ct.shape)
             nii = out_nii / f"{p.pid}_gradcam.nii.gz"
             nib.save(nib.Nifti1Image(full, ct_img.affine), nii)
             (a_ct, a_cam, z), (s_ct, s_cam, xc) = views(ct, full, row)
@@ -162,16 +172,17 @@ def main() -> None:
             panel(axes[1], a_ct, a_cam, organ, f"Grad-CAM axial z={z}")
             panel(axes[2], s_ct, s_cam, organ, f"Grad-CAM sagittal x={xc}")
             fig.suptitle(f"{organ} | pid {p.pid} | {p.group}-risk | event={int(p.event)} | "
-                         f"eta={eta:.2f}{caveat}", fontsize=9)
+                         f"eta={eta:.2f} | CAM in mask {frac_in:.0%}{caveat}", fontsize=9)
             fig.tight_layout()
             png = out_fig / f"{p.pid}.png"
             fig.savefig(png, dpi=110)
             plt.close(fig)
             over.append((p, a_ct, a_cam, s_ct, s_cam, eta))
             manifest.append({"organ": organ, "pid": p.pid, "group": p.group, "event": int(p.event),
-                             "time_days": p.time, "eta": round(eta, 4),
-                             "nifti": str(nii.relative_to(PROJECT)), "png": str(png.relative_to(PROJECT))})
-            print(f"[{organ}] {p.group} {p.pid} ev={int(p.event)} eta={eta:.2f} -> {png.name}", flush=True)
+                             "time_days": p.time, "eta": round(eta, 4), "cam_frac_in_mask": round(frac_in, 3),
+                             "nifti": os.path.relpath(nii, PROJECT), "png": os.path.relpath(png, PROJECT)})
+            print(f"[{organ}] {p.group} {p.pid} ev={int(p.event)} eta={eta:.2f} "
+                  f"CAM-in-mask={frac_in:.2f} -> {png.name}", flush=True)
 
         k = args.top_k
         fig, axes = plt.subplots(2, k, figsize=(3.2 * k, 7.5), squeeze=False)
