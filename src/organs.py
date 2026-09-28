@@ -1,19 +1,25 @@
-"""Shared organ definitions for the student pipeline.
+"""Shared organ definitions for the lungs/sternum 3D CNN.
 
-Reuses the mentor's TotalSegmentator label map and sternum-anchored anterior-
-mediastinum (thymus proxy) geometry from code/extract_organ_embeddings.py and
-code/prevascular_roi.py verbatim/adapted -- NOT reimplemented from scratch --
-so our organ masks stay consistent with the discovery_pipeline's conventions
-and any Stage 6 benchmark against it is a fair comparison.
+Reuses the mentor's TotalSegmentator label map (code/extract_organ_embeddings.py)
+verbatim, so our masks stay consistent with the discovery_pipeline's
+conventions. Only two organs are modelled:
 
-We only pull in the pure numpy/scipy geometry, not the torch/3DINO parts of
-extract_organ_embeddings.py (those files import torch/dinov2 at module level,
-which we don't need until Stage 3's CNN).
+  lungs    union of the 5 TotalSegmentator lobe labels -- POSITIVE control
+           (lung cancer grows here; emphysema/density are known risk factors)
+  sternum  TotalSegmentator sternum label -- NEGATIVE control (no biological
+           route to lung cancer; any "signal" is a red flag for age/sex/scanner
+           confounding)
 """
 from __future__ import annotations
 
+from pathlib import Path
+
+import nibabel as nib
 import numpy as np
-from scipy.ndimage import distance_transform_edt, label as cc_label
+
+REPO = Path("/faststorage/project/aura_thymus")
+CT_DIR = REPO / "derived" / "ct_1x1x2mm"
+SEG_DIR = REPO / "derived" / "totalseg_fullres"
 
 # ── merged 117-class TotalSegmentator label map ──────────────────────────────
 # copied verbatim from code/extract_organ_embeddings.py (_PARTS/LABEL_NAMES)
@@ -52,146 +58,49 @@ LABEL_NAMES = {off + i + 1: name
                for off, names in _PARTS for i, name in enumerate(names)}
 NAME_TO_LABEL = {v: k for k, v in LABEL_NAMES.items()}
 
-# ── the 7 organs swept in this project ───────────────────────────────────────
-# Mix of: expected-positive (lungs, anterior_mediastinum), plausible
-# (heart, aorta), immune/abdominal (spleen, liver), and a bony NEGATIVE
-# CONTROL (sternum -- no biological reason to carry lung-cancer signal, so if
-# it ranks high in Stage 4 that's a red flag for scanner/positioning leakage
-# rather than real biology).
 LUNG_LOBE_NAMES = [
     "lung_upper_lobe_left", "lung_lower_lobe_left",
     "lung_upper_lobe_right", "lung_middle_lobe_right", "lung_lower_lobe_right",
 ]
 ORGAN_SET = {
-    "anterior_mediastinum": "custom",              # thymus proxy -- see mediastinum_mask()
     "lungs": [NAME_TO_LABEL[n] for n in LUNG_LOBE_NAMES],  # union of 5 TS lobes
-    "heart": [NAME_TO_LABEL["heart"]],
-    "aorta": [NAME_TO_LABEL["aorta"]],
-    "liver": [NAME_TO_LABEL["liver"]],
-    "spleen": [NAME_TO_LABEL["spleen"]],
-    "sternum": [NAME_TO_LABEL["sternum"]],          # bony negative control
+    "sternum": [NAME_TO_LABEL["sternum"]],                  # bony negative control
 }
 
 MARGIN_VOX = 8      # same margin as extract_organ_embeddings.py
 MIN_VOX = 500       # same minimum-size gate as extract_organ_embeddings.py
 AIR_HU = -1000.0    # background value for mask-zeroed crops (real air HU)
 
-# HU display/normalization windows, same convention as
-# code/render_saliency_overlays.py (soft-tissue WL40/WW400, lung WL-600/WW1500)
-ST_LO, ST_HI = -160.0, 240.0
-LU_LO, LU_HI = -1350.0, 150.0
+# HU windows (lo, hi) used to rescale to [0, 1] before the CNN.
+#   lungs:   lung window WL-600/WW1500 (code/render_saliency_overlays.py)
+#   sternum: bone window WL400/WW1800. The legacy pipeline used the
+#            soft-tissue window [-160, 240] here, which saturates all bone
+#            (>240 HU) -- LEGACY_WINDOW keeps that only to reproduce the old
+#            model exactly.
+WINDOW = {"lungs": (-1350.0, 150.0), "sternum": (-500.0, 1300.0)}
+LEGACY_WINDOW = {"lungs": (-1350.0, 150.0), "sternum": (-160.0, 240.0)}
 
 
 def window_for(organ: str):
-    return (LU_LO, LU_HI) if organ == "lungs" else (ST_LO, ST_HI)
+    return WINDOW[organ]
 
 
-def _find_axis(axcodes, a, b):
-    for i, c in enumerate(axcodes):
-        if c in (a, b):
-            return i
-    raise ValueError(f"no {a}/{b} axis in axcodes {axcodes}")
+def load_patient(pid: str, yr: int = 0):
+    """Canonical (RAS) CT + TotalSegmentator seg for one scan, plus the CT image
+    (for its affine) and voxel size in mm."""
+    ct_img = nib.as_closest_canonical(nib.load(CT_DIR / f"{pid}_yr{yr}.nii.gz"))
+    seg_img = nib.as_closest_canonical(nib.load(SEG_DIR / f"{pid}_yr{yr}" / "seg.nii.gz"))
+    ct = np.asarray(ct_img.dataobj, dtype=np.float32)
+    seg = np.asarray(seg_img.dataobj, dtype=np.int16)
+    vox = np.array(ct_img.header.get_zooms()[:3], dtype=np.float64)
+    if ct.shape != seg.shape:
+        raise ValueError(f"{pid}: CT shape {ct.shape} != seg shape {seg.shape}")
+    return ct, seg, vox, ct_img
 
 
-def sternum_per_slice_roi(stern, axcodes, vox,
-                          lateral_mm=20.0, posterior_mm=30.0,
-                          skip_inferior_fraction=1 / 4,
-                          skip_superior_fraction=1 / 6):
-    """Per-axial-slice ROI anchored to the sternum (anterior mediastinum).
-    Copied from code/extract_organ_embeddings.py -- identical geometry."""
-    lr = _find_axis(axcodes, 'L', 'R')
-    ap = _find_axis(axcodes, 'A', 'P')
-    si = _find_axis(axcodes, 'S', 'I')
-
-    lat_vox = int(np.round(lateral_mm / vox[lr]))
-    post_vox = int(np.round(posterior_mm / vox[ap]))
-    high_ap_is_post = axcodes[ap] == 'P'
-
-    roi = np.zeros(stern.shape, dtype=bool)
-    slice_axes = [i for i in range(3) if i != si]
-    lr_col = slice_axes.index(lr)
-    ap_col = slice_axes.index(ap)
-
-    si_vals = np.argwhere(stern.any(axis=tuple(i for i in range(3) if i != si)))[:, 0]
-    depth = si_vals.max() - si_vals.min()
-    if axcodes[si] == 'S':
-        si_keep = range(int(si_vals.min() + skip_inferior_fraction * depth),
-                        int(si_vals.max() - skip_superior_fraction * depth) + 1)
-    else:
-        si_keep = range(int(si_vals.min() + skip_superior_fraction * depth),
-                        int(si_vals.max() - skip_inferior_fraction * depth) + 1)
-
-    for z in si_keep:
-        idx = [slice(None), slice(None), slice(None)]
-        idx[si] = z
-        stern_sl = stern[tuple(idx)]
-        if not stern_sl.any():
-            continue
-        pts = np.argwhere(stern_sl)
-        lr_lo = max(0, pts[:, lr_col].min() - lat_vox)
-        lr_hi = min(stern.shape[lr] - 1, pts[:, lr_col].max() + lat_vox)
-        if high_ap_is_post:
-            ap_lo = pts[:, ap_col].min()
-            ap_hi = min(stern.shape[ap] - 1, pts[:, ap_col].max() + post_vox)
-        else:
-            ap_hi = pts[:, ap_col].max()
-            ap_lo = max(0, pts[:, ap_col].min() - post_vox)
-        roi_sl = roi[tuple(idx)]
-        fill = [slice(None), slice(None)]
-        fill[lr_col] = slice(lr_lo, lr_hi + 1)
-        fill[ap_col] = slice(ap_lo, ap_hi + 1)
-        roi_sl[tuple(fill)] = True
-
-    return roi
-
-
-def mediastinum_mask(ct: np.ndarray, seg: np.ndarray, axcodes, vox) -> np.ndarray | None:
-    """Anterior mediastinum (thymus proxy): sternum-anchored ROI, minus all TS
-    structures, soft-tissue voxels only, largest connected component. Adapted
-    from code/extract_organ_embeddings.py's compute_custom_masks (label 203)."""
-    stern = seg == NAME_TO_LABEL["sternum"]
-    if not stern.any():
-        return None
-    roi = sternum_per_slice_roi(stern, axcodes, vox)
-
-    ap = _find_axis(axcodes, 'A', 'P')
-    si = _find_axis(axcodes, 'S', 'I')
-    high_ap_is_post = axcodes[ap] == 'P'
-    ap_col_2d = ap if ap < si else ap - 1
-    post_of_stern = np.zeros(seg.shape, dtype=bool)
-    for z in range(seg.shape[si]):
-        sl_idx = [slice(None)] * 3
-        sl_idx[si] = z
-        stern_sl = stern[tuple(sl_idx)]
-        if not stern_sl.any():
-            continue
-        ap_coords = np.argwhere(stern_sl)[:, ap_col_2d]
-        post_edge = int(ap_coords.max() if high_ap_is_post else ap_coords.min())
-        post_sl = post_of_stern[tuple(sl_idx)]
-        post_range = [slice(None), slice(None)]
-        if high_ap_is_post:
-            post_range[ap_col_2d] = slice(post_edge + 1, None)
-        else:
-            post_range[ap_col_2d] = slice(0, post_edge)
-        post_sl[tuple(post_range)] = True
-
-    ts_any = seg > 0
-    soft_tissue = (ct >= -200) & (ct <= 300)
-    mediastinum = roi & post_of_stern & ~ts_any & soft_tissue
-    cc, n_cc = cc_label(mediastinum)
-    if n_cc == 0:
-        return None
-    largest = np.argmax(np.bincount(cc.ravel())[1:]) + 1
-    mediastinum = cc == largest
-    return mediastinum if mediastinum.sum() >= MIN_VOX else None
-
-
-def organ_mask(name: str, ct: np.ndarray, seg: np.ndarray, axcodes, vox) -> np.ndarray | None:
-    """Boolean mask (native CT shape) for one of the 7 organs in ORGAN_SET."""
-    spec = ORGAN_SET[name]
-    if spec == "custom":
-        return mediastinum_mask(ct, seg, axcodes, vox)
-    mask = np.isin(seg, spec)
+def organ_mask(name: str, seg: np.ndarray) -> np.ndarray | None:
+    """Boolean mask (native CT shape) for one organ in ORGAN_SET."""
+    mask = np.isin(seg, ORGAN_SET[name])
     return mask if mask.sum() >= MIN_VOX else None
 
 

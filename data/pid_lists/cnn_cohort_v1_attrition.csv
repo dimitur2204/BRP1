@@ -1,0 +1,5 @@
+step,n,events,train_n,train_events,val_n,val_events,test_n,test_events
+enriched ∩ manifest,6373,1061,2226,742,2067,159,2080,160
+series is baseline (study yr 0),6359,1047,2215,731,2065,157,2079,159
+has CT + TotalSegmentator mask,6359,1047,2215,731,2065,157,2079,159
+CT z-extent >= 80 slices,6306,1037,2191,725,2048,155,2067,157

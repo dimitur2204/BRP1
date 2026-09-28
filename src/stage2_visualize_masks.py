@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
 """Stage 2 -- per-organ masking + visualization for a handful of subset patients.
 
-For each sample patient and each of the 7 organs in organs.ORGAN_SET, shows:
+For each sample patient and each organ in organs.ORGAN_SET (lungs, sternum), shows:
   left column  -- context: the whole axial slice at the mask's centroid, with
                   the organ's mask contour overlaid (is the mask in the right
                   place, at the right scale?)
   right column -- crop: the mask-zeroed bounding-box crop at native
-                  resolution (exactly what Stage 3's CNN will read, modulo
-                  the final resize -- that's a modeling choice made in Stage 3)
+                  resolution (what c1_cache_volumes.py then resamples)
 
-Reuses the mentor's HU display windows (code/render_saliency_overlays.py):
-soft-tissue WL40/WW400 for everything except "lungs", which uses the lung
-window WL-600/WW1500 (a soft-tissue window would show nothing but noise
-inside aerated lung).
+HU display windows come from organs.WINDOW: lung window WL-600/WW1500 for
+"lungs", bone window WL400/WW1800 for "sternum" (a soft-tissue window would
+saturate the bone, which is exactly the legacy pipeline's sternum bug).
 
-Does NOT resize crops or touch torch -- that's deferred to Stage 3, which
-decides the CNN's input size. This stage only proves the masks are correct.
+Does NOT resample crops -- that's c1_cache_volumes.py. This stage only
+proves the masks are correct.
 
 Usage:
     env/.venv/bin/python src/stage2_visualize_masks.py
@@ -31,11 +29,7 @@ import matplotlib.pyplot as plt
 import nibabel as nib
 import numpy as np
 
-from organs import ORGAN_SET, organ_mask, mask_zeroed_crop, window_for
-
-REPO = Path("/faststorage/project/aura_thymus")
-CT_DIR = REPO / "derived" / "ct_1x1x2mm"
-SEG_DIR = REPO / "derived" / "totalseg_fullres"
+from organs import ORGAN_SET, organ_mask, mask_zeroed_crop, window_for, load_patient
 
 PROJECT = Path(__file__).resolve().parents[1]
 SUBSET_CSV = PROJECT / "data" / "pid_lists" / "subset_v1.csv"
@@ -46,20 +40,8 @@ OUT_DIR = PROJECT / "figs" / "stage2_masks"
 SAMPLE_PIDS = ["132386", "133201", "214994", "208196", "110999"]
 
 
-def load_patient(pid: str, yr: int = 0):
-    ct_img = nib.as_closest_canonical(nib.load(CT_DIR / f"{pid}_yr{yr}.nii.gz"))
-    seg_img = nib.as_closest_canonical(nib.load(SEG_DIR / f"{pid}_yr{yr}" / "seg.nii.gz"))
-    ct = np.asarray(ct_img.dataobj, dtype=np.float32)
-    seg = np.asarray(seg_img.dataobj, dtype=np.int16)
-    axcodes = nib.orientations.aff2axcodes(ct_img.affine)
-    vox = np.array(ct_img.header.get_zooms()[:3])
-    if ct.shape != seg.shape:
-        raise ValueError(f"{pid}: CT shape {ct.shape} != seg shape {seg.shape}")
-    return ct, seg, axcodes, vox
-
-
 def plot_patient(pid: str, event: int | None) -> Path:
-    ct, seg, axcodes, vox = load_patient(pid)
+    ct, seg, vox, _ = load_patient(pid)
 
     organ_names = list(ORGAN_SET.keys())
     fig, axes = plt.subplots(len(organ_names), 2, figsize=(8, 3.4 * len(organ_names)))
@@ -70,7 +52,7 @@ def plot_patient(pid: str, event: int | None) -> Path:
         lo, hi = window_for(name)
         ax_ctx, ax_crop = axes[row, 0], axes[row, 1]
 
-        mask = organ_mask(name, ct, seg, axcodes, vox)
+        mask = organ_mask(name, seg)
         if mask is None:
             for ax in (ax_ctx, ax_crop):
                 ax.text(0.5, 0.5, "mask not found\n(< MIN_VOX or missing)",

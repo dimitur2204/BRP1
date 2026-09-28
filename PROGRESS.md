@@ -1,63 +1,58 @@
-# PROGRESS — heart radiomics → lung-cancer risk
+# PROGRESS — lungs / sternum 3D CNN at scale
 
-Running log of what was built, found and decided. The plan and status live in `PLAN.md`.
-The previous CNN pipeline's log is in git history (commit `eb3b89b`).
+Running log. Plan/status: `PLAN.md`. Explanations: `docs/cnn3d_explained.md`.
 
-## 2026-09-26 — Pivot + feasibility check
+## 2026-09-28 — branch, cleanup, C0–C5 code, smoke tests
 
-**Pivot:** from per-organ 3D CNNs to heart radiomics + DeepSurv, with
-lung-cancer incidence as the outcome (user decision: exploratory, novel, a null
-result is acceptable).
+**Branch** `cnn3d-lungs-sternum` from `main`.
+- Removed: 2D CNN (`stage3_cnn.py`, figs, results), `stage4_ranking.py`, the
+  5 non-target organs' figures, anterior-mediastinum saliency, and the
+  superseded legacy scripts (`build_subset`, `cache_organ_crops`,
+  `stage3_cnn3d`, `stage5_km_curve`, `stage6_saliency` + submits). They are
+  all in git history.
+- Kept: `data/legacy_400/` (lungs/sternum rows of the old results),
+  `figs/legacy_400/`, `subset_v1.csv`.
+- `organs.py` is reduced to lungs + sternum. It adds a bone window for sternum
+  and a `LEGACY_WINDOW` for exact reproduction. `stage2_visualize_masks.py`
+  is narrowed and its figures regenerated.
 
-**Facts established while checking feasibility:**
-- Manifest (`experiments/lcrisk_discovery/data/manifest.csv`): 26,254
-  baseline scans, 1,061 lung-cancer events. `time` is in days (median 2,424,
-  max 2,983, so about 8 years of follow-up).
-- Enriched cohort ∩ manifest: 6,373 pids with **all 1,061 events**. Split
-  event counts: train 742/2,226, val 159/2,067, test 160/2,080. The heavy
-  imbalance between train and val/test is by construction (mentor's
-  enrichment), so calibration on this cohort is biased.
-- Kernels are heterogeneous: STANDARD 13,738, B30f 7,219, C 2,184, FC51
-  1,118, B50f 822, FC10 419, B 320, BONE 319 (full manifest). This is a major
-  radiomics confounder and has to be handled in R3.
-- `ct_1x1x2mm` and `totalseg_fullres` seg share the same grid (checked for
-  pid 132386: 320×320×133, 1×1×2 mm). Heart = TotalSegmentator label 51
-  (`organs.NAME_TO_LABEL`).
-- The venv is **Python 3.9.25** (CLAUDE.md says 3.11, which is out of date).
-  pyradiomics 3.1.0 has a cp39 manylinux wheel, and scikit-survival 0.23.1
-  is available.
-- **IDC-780 clinical data has no mortality, cause of death, pack-years,
-  BMI or comorbidities.** Per the data dictionary, `prsn` only has age,
-  gender, race, cigsmok, screening results and lung-cancer fields. `ctab` has
-  code 60 "Significant cardiovascular abnormality" (a possible cardiac sanity
-  label).
-- **Blocker:** `meta/nlst_780/*.csv` are `rw-rw---- mer:mer`, so they are
-  unreadable for us (group `aura_thymus`). Mentor access is needed for
-  clinical covariates. The world-readable `.zip` copies were deliberately
-  not used, since the restriction on the CSVs looks intentional. Confirm
-  with the mentor.
+**Facts found while planning**
+- Enriched cohort = all cases + controls sampled at **8.4% (train) vs ~50%
+  (val/test)**, giving event rates of 33% vs 7.7%. See
+  `cnn_cohort_v1_sampling.csv`.
+- The manifest's `label` equals `event` exactly.
+- 26% of cancers are diagnosed within 1 year of the baseline scan (median
+  828 d). Lead-time analysis is essential for the lungs model.
+- 399/400 legacy subset pids are in the cohort. The old test set (127/18) is
+  fully inside the new test set (2,067/157).
 
-**Housekeeping:** committed Stage 6 + final CNN PLAN/PROGRESS (`eb3b89b`).
-Added `data/saliency/` (254 MB of regenerable NIfTI) to `.gitignore`. Then
-removed the old PLAN.md/PROGRESS.md.
+**C0** (`src/c0_build_cohort.py`, a port of the radiomics R0): 6,306 pts /
+1,037 events; train 2,191/725, val 2,048/155, test 2,067/157. pid/time/event/split
+are identical to `heart-radiomics:heart_cohort_v1.csv`. The prsn clinical
+table is optional. The TCIA download was **denied by the session's permission
+classifier (PII)**, so clinical columns are empty for now. The cohort is
+unaffected (that exclusion step removed nobody on the radiomics branch).
 
-**Follow-up search for clinical data (user asked):**
-- `nlst.csv` (203,087 series / 26,254 patients) is IDC DICOM series metadata.
-  `PatientAge`, `PatientSex`, `SeriesDate`, `AnalysisResult` are 100% empty
-  (de-identified). Useful part: `SeriesDescription` is a comma-coded
-  acquisition string, e.g. `1,OPA,GE,LSULT,STANDARD,380,1.2,120,60,44.4,1.4`
-  (study yr, ?, vendor, model, kernel, ?, ?, kVp, mA, ?, ?). The exact field
-  meanings still need to be confirmed in R0 before use.
-- `derived/` holds only images/masks/embeddings/saliency, no tables.
-- `discovery_pipeline/nlst_root/meta/nlst_780/nlst_780_prsn_idc_20210527.csv`
-  is another copy of prsn, also `rw-r----- mer:mer`, so it is unreadable too.
-- `discovery_pipeline/NLST_thymic_health_scores_published.csv` (25,030 pids:
-  continuous + categorical thymic health) is readable. It isn't needed now,
-  but could be a later covariate/comparison.
-- Conclusion: the only missing inputs are age, sex, cigsmok (prsn) and the
-  ctab code-60 flag. Both need the mentor to grant access.
-- CLAUDE.md updated for the radiomics project (Python 3.9, new deps, access
-  rule, new source-of-truth cohort file).
+**C1** (`src/c1_cache_volumes.py`) smoke test on 3 + 40 pids:
+- 2.9 s/pid, so 20 array tasks take ~16 min.
+- The legacy path reproduces the old `resize_and_window` of the old cached
+  crops to max |diff| 2.4e-4 (float16).
+- **Sternum saturation confirmed:** 56–57% of in-mask sternum voxels are
+  > 240 HU, the legacy upper bound, with median sternum HU 233–253. The old
+  sternum "negative control" saw mostly clipped bone.
+- In the legacy lungs input, outside-mask background has the same value
+  (0.23) as aerated lung (visible in the QC figure).
+- The new iso grid keeps true aspect. 1/40 lungs and 1/40 sternum exceeded
+  the FOV slightly (`iso_clipped`); the count over the full cohort is
+  reported at merge.
 
-**Next:** R0 cohort build + R1 visual QC (both local, light). Then write the
-R2 extraction script and sbatch array for the user to submit.
+**C2/C3/C4/C5**
+- `cox_ph_loss` equals a brute-force Breslow partial likelihood (diff 4e-8).
+  Minimizing it reproduces sksurv's Breslow β (0.5756 vs 0.5756).
+- CPU smoke runs (24 pids/split, 2 epochs) pass for new-recipe grid, legacy
+  scale/subset, score_old, and final (main/bce/lc/null). Each writes
+  config/history/pred/curves/model/result.
+- The grid is 34 runs in 12 array tasks; final is 46 runs in 16 tasks.
+
+**Next:** user submits C1 → merge/QC → C2 grid → C3 → C2 final → C4 → C5.
+Then fill doc section 9 and publish the web page.
