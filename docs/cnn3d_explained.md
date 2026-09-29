@@ -11,8 +11,8 @@ This document explains every part of the 3D CNN pipeline on branch
 - what "stratification" means here;
 - whether age/sex/smoking adjustment is needed.
 
-Section 9 holds the results and the explanation of *why* lungs and sternum differ.
-It is filled in from `data/c4_*.csv` once the GPU runs have finished.
+Section 9 holds the results and the explanation of *why* lungs and sternum differ,
+taken from `data/c4_*.csv`.
 
 The code lives in `src/c0_…c5_*.py`, the shared pieces in `src/cnn3d.py` and
 `src/organs.py`.
@@ -349,9 +349,11 @@ image only, so its score means "what the image says". C4 then:
 - **For interpretation: yes, essential.** It is the only way to say whether
   the lungs signal is "lung biology or visible disease" rather than "an
   age/smoking detector", and whether the sternum control is really null.
-- Even without the clinical table we can partly check this with **image-derived
-  covariates**: lung volume, LAA-950 emphysema index, mean lung density,
-  Perc15, sternum HU and volume, plus kernel. That is what C4 does now
+- C4 also adjusts for **image-derived covariates**: lung volume, LAA-950
+  emphysema index, mean lung density, Perc15, sternum HU and volume, plus
+  kernel. This separates "the CNN measures emphysema" from "the CNN sees
+  more". Answer: lungs HR/SD falls from 1.87 to 1.68 after adjustment, so
+  the signal survives. Sternum falls from 1.13 to 1.01, so it vanishes
   (section 9).
 
 ### Clinical covariates: source
@@ -375,21 +377,197 @@ columns are filled. It only runs after the C2 training runs exist.
 
 ## 9. Results and why lungs and sternum differ
 
-*Pending: filled in from `data/c4_*.csv` after `sbatch … submit_c2_train.sh final` and `c4_evaluate.py`.*
+All numbers are on the **held-out test set**: 2,067 patients / 157 cancers for
+lungs, 2,066 / 157 for sternum. It was read once, by `c4_evaluate.py`, for
+configs chosen on validation only. CIs are 1,000-resample event-stratified
+bootstraps. "Ensemble" means the mean of the val-standardised η over seeds.
+Sources:
+- tables: `data/c4_test_metrics.csv`, `c4_delta_c.csv`, `c4_hr_adjusted.csv`,
+  `c4_reference_models.csv`, `c4_why_*.csv`;
+- figures: `figs/c4_*.png`, `figs/c3_val_grid.png`.
 
-Planned decomposition of the "real difference" (old → new):
+### 9.1 Headline
 
-| step | model group | what changes | question answered |
-|---|---|---|---|
-| 1 | `old_ckpt@old_test` | – | reproduces the old 0.687 (127 pts / 18 cancers) |
-| 2 | `old_ckpt` | test set 127 → 2,067 | was 0.687 real, or small-sample luck? |
-| 3 | `legacy_subset` | retrain with 2,048 val patients for selection | how noisy is the old recipe itself? |
-| 4 | `legacy_scale` | train 179 → 2,191 patients | effect of data size alone |
-| 5 | `new_lc_*` → `new_main` | new preprocessing + Cox, at 179 / 548 / 1,096 / 2,191 train | effect of the fixes, and the learning curve |
-| 6 | `new_bce`, `new_noaug` | one component removed | how much does the objective / augmentation matter? |
-| 7 | `null` | labels permuted | the floor (≈ 0.5) |
+| | lungs | sternum |
+|---|---|---|
+| test Harrell C, new model (5-seed ensemble) | **0.688** [0.652, 0.724] | **0.538** [0.491, 0.584] |
+| mean single seed ± sd | 0.673 ± 0.016 | 0.536 ± 0.008 |
+| Uno C (τ = 6 y) | 0.687 | 0.538 |
+| td-AUC 1 / 3 / 5 y | 0.71 / 0.68 / 0.69 | 0.58 / 0.52 / 0.54 |
+| KM tertiles, log-rank p (events low/mid/high) | 2.8e-13 (19 / 46 / 92) | 0.035 (38 / 61 / 58) |
+| HR per SD, unadjusted | 1.87 [1.61, 2.17] | 1.13 [0.98, 1.30], p = 0.10 |
+| HR per SD, + age/sex/smoking + kernel | **1.68** [1.43, 1.98] | **1.01** [0.87, 1.18], p = 0.89 |
+| ΔC, clinical + CNN vs clinical only | **+0.059** [0.025, 0.093] | **0.000** [−0.013, 0.013] |
+| permuted-label null, test C | 0.520 | 0.502 |
 
-"Why" analyses: lead time (events ≤ 1 y vs a 1-year landmark), kernel strata,
-correlation of the score with lung volume / LAA-950 / density (lungs) and bone
-HU / size (sternum), HR adjusted for these, a covariate-only baseline, and
-Grad-CAM (`figs/c5_gradcam/`).
+**Lungs minus sternum: ΔC = 0.151 [0.100, 0.203]** (paired bootstrap on the
+same test patients). This is the "real difference".
+- The lungs model carries lung-cancer information *beyond* age, sex and
+  smoking.
+- The sternum model carries none once age/sex/smoking are known. The
+  negative control behaves as a negative control should.
+
+### 9.2 Decomposition: from the old 0.687 to today
+
+| step | group | train pts / events | test | test C [95% CI] | binary AUC |
+|---|---|---|---|---|---|
+| 1 | `old_ckpt@old_test` (the published model and test set) | 179 / 83 | 127 / 18 | lungs 0.659 [0.52, 0.78]; sternum 0.595 [0.47, 0.71] | **0.688**; **0.607** (= old paper values, reproduced) |
+| 2 | `old_ckpt`, same model, full test | 179 / 83 | 2,067 / 157 | lungs **0.615** [0.574, 0.659]; sternum **0.502** [0.456, 0.550] | 0.623; 0.504 |
+| 3 | `legacy_subset`, old recipe retrained, selected on 2,048 val pts | 179 / 83 | full | lungs 0.630; sternum 0.530 | |
+| 4 | `legacy_scale`, old recipe on all train (3 seeds) | 2,189 / 725 | full | lungs **0.680** [0.638, 0.723]; sternum 0.521 | |
+| 5 | `new_main`, new recipe (5 seeds) | 2,189 / 725 | full | lungs **0.688** [0.652, 0.724]; sternum 0.538 | |
+
+What each step says:
+1. **The old numbers are reproduced exactly**, so the legacy path in C1/C4
+   is faithful.
+2. **The old sternum 0.607 was noise.** On 157 cancers the same checkpoint
+   scores 0.502. The old lungs model was real but weaker than reported:
+   0.615, not 0.687. With 18 test cancers the CI was 0.52–0.78, and 0.687
+   happened to sit on its lucky side.
+3. **Data size is the dominant factor.** The old recipe gains **+0.065**
+   [0.020, 0.109] (paired, p = 0.004) from 12× more training patients
+   (step 2 → 4).
+4. **The new recipe adds little on top at this scale.**
+   - The gain is **+0.008** [−0.022, 0.041] (p = 0.60): not distinguishable
+     from zero (step 4 → 5).
+   - The learning curve (`figs/c4_learning_curve.png`) shows why. At 179
+     patients the new recipe is *worse* than the legacy one (0.607 vs
+     0.630): 2 channels, isotropic grid, more parameters to fit. It overtakes
+     by full size (per-seed mean 0.673 vs 0.662), and is still rising.
+   - It generalises more honestly. Train C is 0.69 vs **0.79** for the
+     legacy recipe, i.e. far less memorisation, for the same test C.
+   - It is more robust to lead time (9.3).
+
+Learning curve, test C per seed (mean over 3 seeds; full = 5 seeds):
+
+| train pts | 179 (old subset) | 547 (25%) | 1,094 (50%) | 2,189 (all) |
+|---|---|---|---|---|
+| lungs new recipe | 0.607 | 0.636 | 0.649 | 0.673 |
+| sternum new recipe | 0.505 | 0.512 | 0.525 | 0.536 |
+
+**Ablations (paired ΔC, new_main minus variant):**
+- **Cox vs BCE: lungs −0.001 [−0.009, 0.007]** (no difference); sternum
+  +0.016 [0.002, 0.032]. With a 1-scan baseline and ≤ 7 y follow-up, "who
+  gets cancer" and "who gets it sooner" rank patients almost identically.
+  Cox is kept because it uses censoring correctly and its output is a proper
+  log-hazard (section 4). It does not buy discrimination here.
+- **Augmentation (±3-voxel shift + HU jitter): lungs +0.032 [0.014, 0.050]**,
+  sternum +0.020. It is the single most useful component of the new recipe.
+  Without it, train C rises to 0.74 while test C drops to 0.656: classic
+  overfitting.
+
+**Selection noise (winner's curse).**
+- The chosen lungs grid config had val C 0.684 at seed 0. The same config
+  over 5 fresh seeds averaged 0.646 on val (range 0.624–0.664).
+- The grid's best is optimistic because it is a max over 12 configs × ~50
+  noisy epochs. Val C swings ±0.03 epoch to epoch.
+- This is why the test set is read once, and why the final model is a
+  5-seed ensemble rather than the grid winner.
+- The null runs show the same effect: val C 0.53–0.54 from early stopping
+  picking the luckiest epoch, but test C 0.50–0.52.
+
+### 9.3 Why the lungs model works: what it has learned
+
+**It is partly an age/smoking/emphysema meter, and partly more.** Spearman ρ
+of the test score with each covariate:
+
+| covariate | lungs ρ | sternum ρ |
+|---|---|---|
+| age | +0.29 | +0.21 |
+| smoking (current) | +0.21 | +0.04 |
+| male | −0.05 | −0.13 |
+| lung volume / sternum volume | +0.28 | +0.01 |
+| LAA-950 (emphysema %) | +0.25 | – |
+| mean lung density | −0.23 | – |
+| sternum mean / median HU (bone density) | – | **−0.73 / −0.76** |
+| sharp kernel | −0.01 | −0.04 |
+
+- The lungs score rises with age, current smoking, emphysema and lung
+  volume (hyperinflation). All of these are known lung-cancer risk factors
+  visible on CT.
+- It is **not** reducible to them:
+  - Adjusting for age/sex/smoking + kernel only lowers HR/SD from 1.87 to
+    1.68. Adding the image covariates (volume, LAA-950, MLD, Perc15) leaves
+    it at 1.74.
+  - A Cox model on those image covariates alone reaches only C 0.562.
+    Clinical only reaches 0.645. The CNN alone reaches **0.688**, and
+    clinical + CNN reaches **0.704**.
+  - The CNN therefore sees something in the lungs that neither the
+    questionnaire nor the classic emphysema/density measures capture.
+- It is **not** scanner-driven. ρ with sharp kernel is ≈ 0. C is 0.68 within
+  soft-kernel scans and 0.76 within sharp-kernel scans (only 20 events,
+  wide).
+
+**Lead time: is it just seeing cancers already there?** 26% of the cohort's
+cancers are diagnosed within a year of the scan, so the baseline CT may
+already show them.
+
+| | events ≤ 1 y vs controls (AUC, 36 events) | 1-y landmark C (only pts event-free at 1 y, 121 events) |
+|---|---|---|
+| new_main | 0.719 | **0.682** |
+| legacy_scale | 0.773 | 0.653 |
+| old_ckpt | 0.676 | 0.598 |
+
+The new model keeps almost all of its discrimination for cancers diagnosed
+**more than a year later** (0.682 vs 0.688 overall). So it is not only a
+nodule detector for prevalent cancers: it ranks *future* risk. The legacy
+recipe at scale leans more on the early cancers (0.773) and less on future
+risk (0.653). One plausible reading is that the 64³ squash keeps the
+high-contrast "something is there" cue but loses the parenchymal texture.
+With 36 early events these two AUCs are not significantly different; treat
+this as a direction, not a result.
+
+### 9.4 Why the sternum model "almost works", and why that is a confound
+
+- Unadjusted, the new sternum model looks weakly positive: C 0.538, and the
+  KM tertiles separate at **log-rank p = 0.035**.
+- A naive reading would say "the negative control failed". Section 8
+  predicted the explanation, and the data confirm it:
+  - The score is **ρ = −0.76 with the sternum's median HU**. The model has
+    learned bone density.
+  - Bone density falls with age and in women. The score has ρ +0.21 with
+    age and −0.13 with male sex.
+  - After age/sex/smoking adjustment, **HR/SD = 1.01 [0.87, 1.18]** and
+    **ΔC over clinical = 0.000**. The sternum adds nothing once age is
+    known.
+- The **old** sternum model could not even do that (test C 0.502). Its
+  soft-tissue window saturated 36–57% of the bone voxels at 240 HU
+  (section 3), so it could not read bone density.
+- Fixing the window "unblinded" the control. The control then immediately
+  picked up the age pathway. **This is exactly why a negative control must
+  be read adjusted.** The unadjusted KM p = 0.035 would otherwise have been
+  reported as a sternum finding.
+
+### 9.5 Summary: why the difference happens
+
+1. **The biology.** Lung cancer, its precursors (emphysema, nodules) and its
+   strongest risk factor (smoking) all live in the lung parenchyma. The CNN
+   reads them, including information beyond age/smoking/density measures,
+   and for cancers diagnosed years later. The sternum has no such route.
+   Its only route is bone density ≈ age/sex, which adjustment removes.
+2. **The old results were distorted by small numbers.** The old difference
+   (0.687 vs 0.607) came from 18 test cancers. On 157 cancers the old models
+   score 0.615 vs 0.502, and the retrained models 0.688 vs 0.538 (ΔC 0.151).
+3. **What improved the lungs model:**
+   - Most of the gain is *data size* (+0.065).
+   - *Augmentation* contributes within the new recipe (+0.032 vs no-aug).
+   - Isotropic resampling, the mask channel and the Cox loss do not
+     measurably raise C at this scale. They make the model correct: it
+     honours censoring, keeps anatomy undistorted, overfits less (train C
+     0.69 vs 0.79), holds up on future cancers, and makes the negative
+     control honest.
+   - The learning curve is still rising at 2,189 patients, so more data
+     (e.g. the full 26k manifest, not just the enriched sample) is the
+     obvious next lever.
+4. **What the numbers can't say.**
+   - Absolute risk and calibration are not estimable. The cohort's
+     case-control enrichment differs by split (section 2).
+   - C ≈ 0.69 is modest in absolute terms. It is a research signal, not a
+     screening tool.
+
+### 9.6 Where the model looks (Grad-CAM)
+
+*Pending `sbatch src/submit_c5_gradcam.sh`.* `figs/c5_gradcam/` will show the
+5 highest- and 5 lowest-risk test patients per organ, together with
+`cam_frac_in_mask` (the share of the CAM mass inside the organ). This column
+checks that the model reads the organ rather than its outline or padding.

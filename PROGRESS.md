@@ -128,4 +128,32 @@ Validation C, mean [min–max] over seeds:
   early stopping picks the luckiest epoch on val. Their test C is the real
   null check.
 
-**Next:** C4 (running) → user: C5 Grad-CAM → doc §9 → web page.
+**C4 (2026-09-29, n-boot 1000, ~20 min):** full write-up is in doc §9.
+- Reproduction check passes: old checkpoints on the old 127/18 test set give
+  binary AUC 0.688 (lungs) and 0.607 (sternum), the published values.
+- The same checkpoints on the full test set (2,067/157) give C 0.615 and
+  0.502. The old sternum result was noise.
+- Test C:
+  - lungs: legacy_scale 0.680, new_main 0.688 [0.652, 0.724], new_bce 0.689,
+    noaug 0.656, null 0.520;
+  - sternum: new_main 0.538, null 0.502.
+- Paired ΔC:
+  - data size (legacy_scale − old_ckpt) +0.065, p = 0.004;
+  - new recipe − legacy_scale +0.008, p = 0.60 (n.s.);
+  - Cox − BCE ≈ 0 for lungs;
+  - aug − noaug +0.032;
+  - lungs − sternum 0.151 [0.100, 0.203].
+- Adjustment:
+  - lungs HR/SD 1.87 → 1.68 after age/sex/smoking + kernel; ΔC clinical+CNN
+    vs clinical +0.059 [0.025, 0.093];
+  - sternum HR/SD 1.13 → 1.01; ΔC 0.000.
+- The sternum score is ρ −0.76 with bone HU and +0.21 with age. Its
+  unadjusted KM log-rank p = 0.035 is an age confound, not biology.
+- Lead time: lungs 1-y landmark C 0.682 (vs 0.653 legacy_scale), so the
+  model predicts future cancers, not just prevalent ones.
+- Train C: new 0.69 vs legacy_scale 0.79. The new recipe overfits less.
+- Learning curve still rising at 2,189 pts.
+- Pitfall: wait loops must use `kill -0 <pid>`. `pgrep -f <script>` matches
+  the loop's own command line and never ends.
+
+**Next:** user: `sbatch src/submit_c5_gradcam.sh` → doc §9.6 → web page.

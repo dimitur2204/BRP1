@@ -51,11 +51,12 @@ difference between them is and *why* it exists. Explain every design choice
   sets). Cox loss verified. ✅ grid (34 runs, job 1053159) and final (46 runs, job 1073738) done 2026-09-29.
 - **C3 — selection** ✅ run → `data/c3_chosen_configs.json` (lungs lr 3e-4 / wd 1e-2 / do 0;
   sternum lr 1e-3 / wd 1e-2 / do 0).
-- **C4 — evaluation** ✅ code. 🔄 running (`logs/c4_evaluate.log`).
-- **C5 — Grad-CAM** ✅ code. ⬜ **user: `sbatch src/submit_c5_gradcam.sh`** after C4.
-- **Doc + web page** 🔄 `docs/cnn3d_explained.md`: sections 0–8 written;
-  section 9 (results) is pending C4. The web page will be published once the
-  results are in.
+- **C4 — evaluation** ✅ run 2026-09-29 (n-boot 1000, ~20 min on login node). Test C lungs 0.688
+  [0.652, 0.724], sternum 0.538 [0.491, 0.584]; ΔC lungs−sternum 0.151. Sternum null after
+  age/sex/smoking adjustment (HR/SD 1.01).
+- **C5 — Grad-CAM** ✅ code. ⬜ **user: `sbatch src/submit_c5_gradcam.sh`** (C4 done).
+- **Doc + web page** 🔄 `docs/cnn3d_explained.md`: sections 0–9 written (9.6 Grad-CAM pending C5).
+  The web page will be published after C5.
 
 ## Open items
 
