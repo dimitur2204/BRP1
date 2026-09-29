@@ -171,22 +171,31 @@ def merge(cache_dir: Path) -> None:
     cohort = pd.read_csv(COHORT_CSV, dtype={"pid": str})
     print(f"merging {len(chunks)} chunks")
     for organ in ORGAN_SET:
-        idx_parts, iso_parts, leg_parts = [], [], []
-        for ch in chunks:
-            meta = pd.read_csv(ch.with_suffix(".csv"), dtype={"pid": str})
-            with np.load(ch) as z:
-                iso_parts.append(z[f"{organ}_iso"])
-                leg_parts.append(z[f"{organ}_legacy64"])
-            idx_parts.append(meta[meta["organ"] == organ])
-        idx = pd.concat(idx_parts, ignore_index=True)
+        metas = [pd.read_csv(ch.with_suffix(".csv"), dtype={"pid": str}) for ch in chunks]
+        idx = pd.concat([m[m["organ"] == organ] for m in metas], ignore_index=True)
         found = idx[idx["found"] == 1].reset_index(drop=True)
-        iso = np.concatenate(iso_parts)
-        leg = np.concatenate(leg_parts)
-        assert len(found) == len(iso) == len(leg), (organ, len(found), len(iso), len(leg))
+        # stream chunk by chunk into memmapped .npy files (~12 GB per organ;
+        # never hold it all in RAM on the login node)
+        iso = leg = None
+        pos = 0
+        for ch in chunks:
+            with np.load(ch) as z:
+                a, b = z[f"{organ}_iso"], z[f"{organ}_legacy64"]
+            assert len(a) == len(b), (organ, ch.name, len(a), len(b))
+            if iso is None:
+                iso = np.lib.format.open_memmap(cache_dir / f"{organ}_iso.npy", mode="w+",
+                                                dtype=a.dtype, shape=(len(found),) + a.shape[1:])
+                leg = np.lib.format.open_memmap(cache_dir / f"{organ}_legacy64.npy", mode="w+",
+                                                dtype=b.dtype, shape=(len(found),) + b.shape[1:])
+            assert pos + len(a) <= len(found), (organ, ch.name, pos + len(a), len(found))
+            iso[pos:pos + len(a)] = a
+            leg[pos:pos + len(b)] = b
+            pos += len(a)
+        assert pos == len(found), (organ, pos, len(found))
+        iso.flush()
+        leg.flush()
         found = found.merge(cohort[["pid", "time", "event", "split", "kernel_group",
                                     "manufacturer", "in_subset_v1"]], on="pid", how="left")
-        np.save(cache_dir / f"{organ}_iso.npy", iso)
-        np.save(cache_dir / f"{organ}_legacy64.npy", leg)
         found.to_csv(cache_dir / f"{organ}_index.csv", index=False)
         missing = set(cohort["pid"]) - set(found["pid"])
         idx[idx["found"] == 0].to_csv(cache_dir / f"{organ}_missing.csv", index=False)

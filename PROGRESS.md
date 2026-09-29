@@ -80,5 +80,52 @@ dropped organs: `data/organ_crops/{anterior_mediastinum,aorta,heart,liver,spleen
 The lungs/sternum legacy crops and checkpoints are kept (C4 re-scores the old
 checkpoints).
 
-**Next:** user submits C1 → merge/QC → C2 grid → C3 → C2 final → C4 → C5.
-Then fill doc section 9 and publish the web page.
+**C1 run + merge (2026-09-29):** all 20 array tasks finished (1.3–5.9 s/pid).
+The first C2 grid submission (job 1025992) failed in every task with
+`FileNotFoundError: data/cnn_cache/lungs_index.csv` because `--merge` had not
+been run yet. `--merge` now streams chunks into memmapped `.npy` files, so it
+never holds the ~12 GB/organ arrays in RAM on the login node (4 min).
+`load_organ` now names the missing merge step.
+- lungs: 6,302 cached, 4 missing (0 events), FOV-clipped 11. Split n/events:
+  train 2,189/725, val 2,046/155, test 2,067/157.
+- sternum: 6,296 cached, 10 missing (1 event), FOV-clipped 77. Split:
+  train 2,188/724, val 2,042/155, test 2,066/157.
+- Merged arrays equal the chunk data (tail spot check). QC figures are in
+  `figs/c1_inputs/` and look correct. 36–57% of in-mask sternum voxels
+  exceed the legacy 240 HU bound; the new [-500, 1300] window covers them.
+
+**C2 grid + C3 (2026-09-29):** grid job 1053159 finished all 34 runs.
+Validation Harrell C by grid config (seed 0):
+- lungs: 0.630–0.684. Best is lr 3e-4, wd 1e-2, dropout 0. lr 1e-4 is
+  consistently lower (0.65–0.67). lr 1e-3 with dropout 0.3 stopped early
+  (0.630).
+- sternum: 0.541–0.556, a flat surface. Best is lr 1e-3, wd 1e-2, dropout
+  0, which ties with 5 other configs within 0.005.
+- Legacy recipe at scale (64³, BCE, 60 epochs, best val AUC), val C over 3
+  seeds: lungs 0.640–0.665, sternum 0.548–0.586.
+- Legacy recipe on the 400-pt subset: lungs 0.633, sternum 0.558.
+
+→ `data/c3_chosen_configs.json`, `data/c3_val_grid.csv`, `figs/c3_val_grid.png`.
+
+**C2 final (job 1073738, 16 tasks, ≤ 21 min each, 2026-09-29):** all 46 runs
+have result/pred/model. pred.csv holds all splits (6,302 / 6,296 rows) with
+finite η. The only stderr is the harmless non-writable-numpy warning.
+
+Validation C, mean [min–max] over seeds:
+
+| organ | main (5) | bce (5) | noaug (3) | lc subset_v1 (3) | lc 25% | lc 50% | null |
+|---|---|---|---|---|---|---|---|
+| lungs | 0.646 [0.624–0.664] | 0.647 | 0.620 | 0.623 | 0.628 | 0.618 | 0.541 |
+| sternum | 0.557 [0.551–0.565] | 0.555 | 0.545 | 0.538 | 0.553 | 0.540 | 0.530 |
+
+- **Winner's curse is visible.** The lungs grid winner had val C 0.684 at
+  seed 0. The identical config (verified: configs differ only in seed)
+  averages 0.646 over 5 new seeds. Val C swings ±0.03 per epoch, so the
+  best of 12 configs × ~50 epochs is optimistic. Patience 12 also stops
+  some seeds early: best epoch 13–36 vs 47 for grid seed 0. Test numbers
+  from C4 are the honest ones.
+- **The null runs' val C (0.53–0.54) is above 0.5 for the same reason:**
+  early stopping picks the luckiest epoch on val. Their test C is the real
+  null check.
+
+**Next:** C4 (running) → user: C5 Grad-CAM → doc §9 → web page.

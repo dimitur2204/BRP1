@@ -100,6 +100,9 @@ def harrell_c(time, eta, event) -> float:
 def load_organ(organ: str, recipe: str, cache_dir: Path = CACHE_DIR, mmap: bool = True):
     """(index DataFrame, array) for one organ; recipe 'iso' or 'legacy64'.
     Row i of the array belongs to index row i."""
+    if not (cache_dir / f"{organ}_index.csv").exists():
+        raise FileNotFoundError(f"{cache_dir}/{organ}_index.csv missing -- run "
+                                "`c1_cache_volumes.py --merge` after the C1 array job")
     idx = pd.read_csv(cache_dir / f"{organ}_index.csv", dtype={"pid": str})
     arr = np.load(cache_dir / f"{organ}_{recipe}.npy", mmap_mode="r" if mmap else None)
     assert len(idx) == len(arr), (organ, recipe, len(idx), len(arr))

@@ -45,13 +45,13 @@ difference between them is and *why* it exists. Explain every design choice
   are complete (the user downloaded the TCIA prsn package; the "has
   age/sex/smoking" step dropped nobody).
 - **C1 — input cache** ✅ code, smoke-tested (legacy path matches the old
-  cache to within 2.4e-4). ⬜ **user: `sbatch src/submit_c1_cache.sh`**, then
-  `--merge` and `--qc`.
+  cache to within 2.4e-4). ✅ run, merged and QC'd 2026-09-29 (lungs 6,302,
+  sternum 6,296 pids cached).
 - **C2 — training** ✅ code, CPU smoke-tested (grid, legacy, score_old, final
-  sets). Cox loss verified. ⬜ **user: `sbatch --array=0-11 src/submit_c2_train.sh grid`**.
-- **C3 — selection** ✅ code. ⬜ run after grid → `data/c3_chosen_configs.json`.
-  ⬜ **user: `sbatch --array=0-15 src/submit_c2_train.sh final`**.
-- **C4 — evaluation** ✅ code. ⬜ run after final.
+  sets). Cox loss verified. ✅ grid (34 runs, job 1053159) and final (46 runs, job 1073738) done 2026-09-29.
+- **C3 — selection** ✅ run → `data/c3_chosen_configs.json` (lungs lr 3e-4 / wd 1e-2 / do 0;
+  sternum lr 1e-3 / wd 1e-2 / do 0).
+- **C4 — evaluation** ✅ code. 🔄 running (`logs/c4_evaluate.log`).
 - **C5 — Grad-CAM** ✅ code. ⬜ **user: `sbatch src/submit_c5_gradcam.sh`** after C4.
 - **Doc + web page** 🔄 `docs/cnn3d_explained.md`: sections 0–8 written;
   section 9 (results) is pending C4. The web page will be published once the

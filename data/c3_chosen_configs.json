@@ -1,0 +1,24 @@
+{
+ "lungs": {
+  "lr": 0.0003,
+  "weight_decay": 0.01,
+  "dropout": 0.0,
+  "val_cindex": 0.6839,
+  "grid_val_cindex_range": [
+   0.6302,
+   0.6839
+  ],
+  "n_grid_runs": 12
+ },
+ "sternum": {
+  "lr": 0.001,
+  "weight_decay": 0.01,
+  "dropout": 0.0,
+  "val_cindex": 0.556,
+  "grid_val_cindex_range": [
+   0.5409,
+   0.556
+  ],
+  "n_grid_runs": 12
+ }
+}
