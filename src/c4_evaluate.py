@@ -33,15 +33,16 @@ Plus:
   - learning-curve figure, decomposition table
 
 Outputs: data/c4_*.csv, data/c4_summary.json, figs/c4_*.png
+(Training curves are drawn by c2_plot_curves.py from the `curves` run set.)
 
 Usage:
     env/.venv/bin/python src/c4_evaluate.py [--n-boot 1000]
+    env/.venv/bin/python src/c4_evaluate.py --figs-only   # redraw figures from data/c4_test_metrics.csv
 """
 from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import warnings
 from pathlib import Path
 
@@ -51,6 +52,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from lifelines import CoxPHFitter, KaplanMeierFitter
+from lifelines.plotting import add_at_risk_counts
 from lifelines.statistics import multivariate_logrank_test
 from scipy.stats import spearmanr
 from sklearn.metrics import roc_auc_score
@@ -76,6 +78,8 @@ GROUP_ORDER = ["old_ckpt", "legacy_subset", "legacy_scale", "new_lc_subset_v1", 
 
 def group_name(cfg: dict) -> str | None:
     tag = cfg["tag"]
+    if cfg["set"] == "curves":                                     # figure-only re-runs: never evaluated
+        return None
     if cfg["set"] == "grid":
         return {"score_old": "old_ckpt", "legacy_subset": "legacy_subset",
                 "legacy_scale": "legacy_scale"}.get(tag)          # "grid" tuning runs: excluded
@@ -184,21 +188,31 @@ def cox_hr(df: pd.DataFrame, cols: list[str], key: str = "score") -> tuple:
 
 # ── plots ────────────────────────────────────────────────────────────────────
 
-def km_panel(ax, te: pd.DataFrame, title: str) -> float:
+KM_LABELS = ["Low", "Mid", "High"]
+
+
+def km_fits(te: pd.DataFrame) -> tuple[list, float]:
+    """KM fit per test-score tertile + multivariate log-rank p."""
     te = te.copy()
-    labels = ["Low", "Mid", "High"]
-    te["group"] = pd.qcut(te["score"].rank(method="first"), 3, labels=labels)  # tie-safe tertiles
-    for lab, col in zip(labels, ["tab:blue", "tab:orange", "tab:red"]):
+    te["group"] = pd.qcut(te["score"].rank(method="first"), 3, labels=KM_LABELS)  # tie-safe tertiles
+    fits = []
+    for lab in KM_LABELS:
         sub = te[te["group"] == lab]
-        KaplanMeierFitter().fit(sub["time"] / 365.25, sub["event"],
-                                label=f"{lab} (n={len(sub)}, ev={int(sub.event.sum())})"
-                                ).plot_survival_function(ax=ax, color=col, ci_show=False)
-    p = multivariate_logrank_test(te["time"], te["group"], te["event"]).p_value
-    ax.set_title(f"{title}\nlog-rank p={p:.2g}", fontsize=9)
+        fits.append(KaplanMeierFitter().fit(sub["time"] / 365.25, sub["event"], label=lab))
+    return fits, multivariate_logrank_test(te["time"], te["group"], te["event"]).p_value
+
+
+def km_panel(ax, fits: list, p: float, title: str, ylim: tuple) -> None:
+    for kmf, col in zip(fits, ["tab:blue", "tab:orange", "tab:red"]):
+        n, ev = int(kmf.event_table["at_risk"].iloc[0]), int(kmf.event_table["observed"].sum())
+        kmf.plot_survival_function(ax=ax, color=col, ci_show=True, ci_alpha=0.15,
+                                   label=f"{kmf._label} tertile (n={n}, ev={ev})")
+    ax.set_title(f"{title}\nlog-rank p={p:.2g} (any difference, not a trend)", fontsize=9)
     ax.set_xlabel("years from baseline CT")
-    ax.set_ylabel("lung-cancer-free")
+    ax.set_ylabel("lung-cancer-free (enriched cohort)")
+    ax.set_ylim(*ylim)
     ax.legend(fontsize=7, loc="lower left")
-    return p
+    add_at_risk_counts(*fits, ax=ax, rows_to_show=["At risk", "Events"], xticks=[0, 2, 4, 6], fontsize=7)
 
 
 def main() -> None:
@@ -207,6 +221,8 @@ def main() -> None:
     ap.add_argument("--runs-dir", default=str(RUNS_DIR))
     ap.add_argument("--cache-dir", default=str(CACHE_DIR))
     ap.add_argument("--out-dir", default="", help="write data/ and figs/ outputs under this dir (smoke tests)")
+    ap.add_argument("--figs-only", action="store_true",
+                    help="skip the analyses; redraw the figures from <data>/c4_test_metrics.csv")
     args = ap.parse_args()
     global DATA_OUT, FIG_OUT
     if args.out_dir:
@@ -226,6 +242,9 @@ def main() -> None:
         raise SystemExit(f"No finished C2 runs under {args.runs_dir} -- run the C2 grid and final "
                          "sets first (see src/submit_c2_train.sh), then re-run c4_evaluate.py.")
     ens = {k: ensemble(v["preds"]) for k, v in groups.items()}
+    if args.figs_only:
+        make_figures(ens, pd.read_csv(DATA_OUT / "c4_test_metrics.csv"))
+        return
     train_ref = cohort[cohort.split == "train"]  # censoring distribution for Uno C / td-AUC
 
     # 1) per-group metrics ----------------------------------------------------
@@ -367,36 +386,61 @@ def main() -> None:
     print("\nReference / combined models:\n", ref.round(3).to_string(index=False))
 
     # 5) figures ---------------------------------------------------------------
+    make_figures(ens, met)
+    json.dump({"clinical_available": bool(clin_ok), "groups": [f"{o}:{g}" for o, g in sorted(groups)],
+               "n_boot": args.n_boot}, open(DATA_OUT / "c4_summary.json", "w"), indent=1)
+    print("\nwrote data/c4_*.csv, figs/c4_*.png")
+
+
+def make_figures(ens: dict, met: pd.DataFrame) -> None:
     FIG_OUT.mkdir(parents=True, exist_ok=True)
+    # KM: one figure per organ, but the SAME y-axis in every panel of both
+    km = {(o, g): km_fits(ens[(o, g)][ens[(o, g)].split == "test"])
+          for o in ORGANS for g in ("old_ckpt", "legacy_scale", "new_main") if (o, g) in ens}
+    if km:
+        lo = min(f.confidence_interval_survival_function_.iloc[:, 0].min() for fits, _ in km.values() for f in fits)
+        ylim = (np.floor((lo - 0.005) * 100) / 100, 1.003)
     for organ in ORGANS:
-        gs = [g for g in ("old_ckpt", "legacy_scale", "new_main") if (organ, g) in ens]
+        gs = [g for g in ("old_ckpt", "legacy_scale", "new_main") if (organ, g) in km]
         if not gs:
             continue
-        fig, axes = plt.subplots(1, len(gs), figsize=(5.2 * len(gs), 4.3), squeeze=False)
+        te = ens[(organ, gs[0])]
+        te = te[te.split == "test"]
+        fig, axes = plt.subplots(1, len(gs), figsize=(5.4 * len(gs), 5.0), squeeze=False)
         for ax, g in zip(axes[0], gs):
-            te = ens[(organ, g)]
-            km_panel(ax, te[te.split == "test"], f"{organ}: {g}")
-        fig.tight_layout()
+            km_panel(ax, *km[(organ, g)], f"{organ}: {g}", ylim)
+        fig.tight_layout(rect=(0, 0.03, 1, 1), w_pad=2.5)
+        fig.text(0.01, 0.005,
+                 f"Test set of an outcome-ENRICHED cohort: all cancers + ~51% of controls (event rate "
+                 f"{te.event.mean():.1%} vs ~4% in the NLST manifest). Curves are not population cancer-free "
+                 "probabilities;\nonly the comparison between tertiles is meaningful. Tertiles of the test-set "
+                 "score; shaded = 95% CI; same y-axis in every KM panel (lungs and sternum). "
+                 "Separation without ordering (low < mid < high) is not evidence of risk ordering.",
+                 fontsize=7, va="bottom")
         fig.savefig(FIG_OUT / f"c4_km_{organ}.png", dpi=110)
         plt.close(fig)
 
     lc = met[met.group.str.startswith("new_lc_") | (met.group == "new_main") |
              met.group.isin(["legacy_subset", "legacy_scale"])].copy()
     if len(lc):
-        fig, ax = plt.subplots(figsize=(6.5, 4.3))
+        fig, ax = plt.subplots(figsize=(6.5, 4.9))
         for organ, col in zip(ORGANS, ["tab:blue", "tab:gray"]):
             n = lc[(lc.organ == organ) & lc.group.str.startswith("new")].sort_values("train_n")
             ax.errorbar(n.train_n, n.seed_c_mean, yerr=n.seed_c_sd.fillna(0), marker="o", color=col,
-                        capsize=3, label=f"{organ}: new recipe (mean +- sd over seeds)")
+                        capsize=3, label=f"{organ}: new recipe (seed mean +- seed SD)")
             l = lc[(lc.organ == organ) & lc.group.str.startswith("legacy")].sort_values("train_n")
-            ax.plot(l.train_n, l.seed_c_mean, "x--", color=col, label=f"{organ}: legacy recipe")
+            ax.errorbar(l.train_n, l.seed_c_mean, yerr=l.seed_c_sd.fillna(0), fmt="x--", color=col,
+                        capsize=3, label=f"{organ}: legacy recipe (2 measured sizes)")
         ax.axhline(0.5, color="k", lw=0.7, ls=":")
         ax.set_xscale("log")
         ax.set_xlabel("training patients (log scale)")
-        ax.set_ylabel("test Harrell C (full test set)")
+        ax.set_ylabel("test Harrell C, single-seed models (full test set)")
         ax.set_title("Learning curve: does more data help?")
         ax.legend(fontsize=7)
-        fig.tight_layout()
+        fig.tight_layout(rect=(0, 0.08, 1, 1))
+        fig.text(0.01, 0.01, "Error bars: SD of single-seed test C across training seeds (3; 5 at full size; "
+                 "legacy 179 = 1 seed),\nnot confidence intervals. The legacy dashed line only connects its two "
+                 "measured training sizes (179, 2,189).", fontsize=7, va="bottom")
         fig.savefig(FIG_OUT / "c4_learning_curve.png", dpi=110)
         plt.close(fig)
 
@@ -415,19 +459,6 @@ def main() -> None:
         fig.tight_layout()
         fig.savefig(FIG_OUT / "c4_headline.png", dpi=110)
         plt.close(fig)
-
-    # keep one training-curve figure per headline model in git (runs/ is ignored)
-    cdir = FIG_OUT / "c4_training_curves"
-    cdir.mkdir(exist_ok=True)
-    for (organ, g), v in groups.items():
-        if g in ("new_main", "legacy_scale", "new_bce", "null"):
-            src = Path(args.runs_dir) / v["cfgs"][0]["set"] / v["cfgs"][0]["run_id"] / "curves.png"
-            if src.exists():
-                shutil.copy(src, cdir / f"{organ}_{g}.png")
-
-    json.dump({"clinical_available": bool(clin_ok), "groups": [f"{o}:{g}" for o, g in sorted(groups)],
-               "n_boot": args.n_boot}, open(DATA_OUT / "c4_summary.json", "w"), indent=1)
-    print("\nwrote data/c4_*.csv, figs/c4_*.png")
 
 
 if __name__ == "__main__":

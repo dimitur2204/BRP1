@@ -74,22 +74,24 @@ def main() -> None:
 
     organs = sorted(grid["organ"].unique())
     dos = sorted(grid["dropout"].unique())
-    fig, axes = plt.subplots(len(organs), len(dos), figsize=(4.2 * len(dos), 3.4 * len(organs)),
-                             squeeze=False)
+    fig, axes = plt.subplots(len(organs), len(dos), figsize=(4.6 * len(dos) + 1.2, 3.6 * len(organs)),
+                             squeeze=False, layout="constrained")
+    vmin, vmax = 0.5, max(0.7, grid.val_cindex.max())
     for i, organ in enumerate(organs):
         for j, do in enumerate(dos):
             g = grid[(grid.organ == organ) & (grid.dropout == do)]
             piv = g.pivot(index="weight_decay", columns="lr", values="val_cindex")
             ax = axes[i, j]
-            im = ax.imshow(piv.values, cmap="viridis", vmin=0.5, vmax=max(0.7, grid.val_cindex.max()))
+            im = ax.imshow(piv.values, cmap="viridis", vmin=vmin, vmax=vmax)
             ax.set_xticks(range(len(piv.columns)), [f"{c:g}" for c in piv.columns])
             ax.set_yticks(range(len(piv.index)), [f"{c:g}" for c in piv.index])
             for (yy, xx), v in np.ndenumerate(piv.values):
-                ax.text(xx, yy, f"{v:.3f}", ha="center", va="center", color="w", fontsize=9)
+                light = (v - vmin) / (vmax - vmin) > 0.6  # dark text on the bright end of viridis
+                ax.text(xx, yy, f"{v:.3f}", ha="center", va="center", color="k" if light else "w", fontsize=9)
             ax.set_xlabel("learning rate")
             ax.set_ylabel("weight decay")
             ax.set_title(f"{organ}, dropout {do:g}: val Harrell C", fontsize=9)
-    fig.colorbar(im, ax=axes, shrink=0.7)
+    fig.colorbar(im, ax=axes, shrink=0.7, label="val Harrell C")
     OUT_FIG.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(OUT_FIG, dpi=110, bbox_inches="tight")
     print(f"wrote {OUT_FIG}")

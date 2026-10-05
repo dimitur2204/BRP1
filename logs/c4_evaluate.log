@@ -1,0 +1,138 @@
+clinical covariates available: True
+groups found: [('lungs', 'legacy_scale'), ('lungs', 'legacy_subset'), ('lungs', 'new_bce'), ('lungs', 'new_lc_0.25'), ('lungs', 'new_lc_0.5'), ('lungs', 'new_lc_subset_v1'), ('lungs', 'new_main'), ('lungs', 'new_noaug'), ('lungs', 'null'), ('lungs', 'old_ckpt'), ('sternum', 'legacy_scale'), ('sternum', 'legacy_subset'), ('sternum', 'new_bce'), ('sternum', 'new_lc_0.25'), ('sternum', 'new_lc_0.5'), ('sternum', 'new_lc_subset_v1'), ('sternum', 'new_main'), ('sternum', 'new_noaug'), ('sternum', 'null'), ('sternum', 'old_ckpt')]
+  organ             group  n_seeds  train_n  train_events  test_n  test_events  harrell_c  c_lo  c_hi  uno_c  td_auc_1y  td_auc_3y  td_auc_5y  binary_auc  train_c  val_c  seed_c_mean  seed_c_sd
+  lungs old_ckpt@old_test        1      179           NaN     127           18      0.659 0.516 0.779    NaN        NaN        NaN        NaN       0.688      NaN    NaN          NaN        NaN
+  lungs          old_ckpt        1      179          83.0    2067          157      0.615 0.574 0.659  0.607      0.670      0.593      0.603       0.623    0.623  0.604        0.615        NaN
+  lungs     legacy_subset        1      179          83.0    2067          157      0.630 0.587 0.673  0.625      0.694      0.620      0.626       0.636    0.644  0.633        0.630        NaN
+  lungs      legacy_scale        3     2189         725.0    2067          157      0.680 0.638 0.723  0.680      0.765      0.681      0.691       0.684    0.791  0.668        0.662      0.019
+  lungs  new_lc_subset_v1        3      179          83.0    2067          157      0.611 0.567 0.652  0.610      0.616      0.592      0.612       0.613    0.622  0.630        0.607      0.005
+  lungs       new_lc_0.25        3      547         181.0    2067          157      0.642 0.602 0.683  0.640      0.641      0.616      0.637       0.648    0.632  0.633        0.636      0.007
+  lungs        new_lc_0.5        3     1094         362.0    2067          157      0.656 0.616 0.696  0.655      0.666      0.639      0.656       0.661    0.648  0.625        0.649      0.005
+  lungs          new_main        5     2189         725.0    2067          157      0.688 0.652 0.724  0.687      0.709      0.675      0.692       0.694    0.693  0.657        0.673      0.016
+  lungs         new_noaug        3     2189         725.0    2067          157      0.656 0.617 0.695  0.658      0.689      0.647      0.654       0.659    0.741  0.629        0.646      0.010
+  lungs           new_bce        5     2189         725.0    2067          157      0.689 0.652 0.725  0.687      0.724      0.679      0.694       0.695    0.697  0.655        0.678      0.012
+  lungs              null        1     2189         725.0    2067          157      0.520 0.473 0.566  0.521      0.474      0.499      0.509       0.524    0.524  0.541        0.520        NaN
+sternum old_ckpt@old_test        1      179           NaN     127           18      0.595 0.468 0.714    NaN        NaN        NaN        NaN       0.607      NaN    NaN          NaN        NaN
+sternum          old_ckpt        1      179          83.0    2066          157      0.502 0.456 0.550  0.497      0.486      0.493      0.497       0.504    0.559  0.522        0.502        NaN
+sternum     legacy_subset        1      179          83.0    2066          157      0.530 0.481 0.578  0.524      0.572      0.525      0.536       0.533    0.549  0.558        0.530        NaN
+sternum      legacy_scale        3     2188         724.0    2066          157      0.521 0.476 0.568  0.517      0.520      0.509      0.520       0.526    0.717  0.572        0.516      0.007
+sternum  new_lc_subset_v1        3      179          83.0    2066          157      0.506 0.457 0.558  0.503      0.528      0.480      0.491       0.511    0.524  0.542        0.505      0.011
+sternum       new_lc_0.25        3      547         181.0    2066          157      0.522 0.472 0.572  0.520      0.542      0.498      0.521       0.526    0.546  0.561        0.512      0.015
+sternum        new_lc_0.5        3     1094         362.0    2066          157      0.525 0.479 0.568  0.526      0.560      0.513      0.528       0.527    0.565  0.545        0.525      0.014
+sternum          new_main        5     2188         724.0    2066          157      0.538 0.491 0.584  0.538      0.579      0.517      0.539       0.540    0.570  0.560        0.536      0.008
+sternum         new_noaug        3     2188         724.0    2066          157      0.517 0.470 0.565  0.518      0.536      0.502      0.522       0.520    0.580  0.548        0.514      0.009
+sternum           new_bce        5     2188         724.0    2066          157      0.521 0.473 0.569  0.521      0.553      0.505      0.521       0.524    0.560  0.559        0.523      0.015
+sternum              null        1     2188         724.0    2066          157      0.502 0.454 0.548  0.497      0.516      0.496      0.500       0.505    0.515  0.530        0.502        NaN
+
+Paired Delta C:
+                    a                    b  delta_c     lo    hi  p_boot  n_paired
+      lungs:new_main   lungs:legacy_scale    0.008 -0.022 0.041   0.598      2067
+    sternum:new_main sternum:legacy_scale    0.017 -0.030 0.063   0.474      2066
+      lungs:new_main       lungs:old_ckpt    0.073  0.025 0.122   0.002      2067
+    sternum:new_main     sternum:old_ckpt    0.036 -0.024 0.096   0.242      2066
+  lungs:legacy_scale       lungs:old_ckpt    0.065  0.020 0.109   0.004      2067
+sternum:legacy_scale     sternum:old_ckpt    0.019 -0.024 0.061   0.348      2066
+      lungs:new_main        lungs:new_bce   -0.001 -0.009 0.007   0.892      2067
+    sternum:new_main      sternum:new_bce    0.016  0.002 0.032   0.022      2066
+      lungs:new_main      lungs:new_noaug    0.032  0.014 0.050   0.000      2067
+    sternum:new_main    sternum:new_noaug    0.020  0.001 0.040   0.038      2066
+      lungs:new_main     sternum:new_main    0.151  0.100 0.203   0.000      2066
+
+Why (lead time / kernel):
+   organ        group                                  analysis    n  events  value
+  lungs     new_main events <= 1y vs all controls (binary AUC) 1946      36  0.719
+  lungs     new_main        1-y landmark (time > 1y) Harrell C 2007     121  0.682
+  lungs     new_main                     kernel=soft Harrell C 1751     137  0.679
+  lungs     new_main                    kernel=sharp Harrell C  316      20  0.758
+  lungs legacy_scale events <= 1y vs all controls (binary AUC) 1946      36  0.773
+  lungs legacy_scale        1-y landmark (time > 1y) Harrell C 2007     121  0.653
+  lungs legacy_scale                     kernel=soft Harrell C 1751     137  0.665
+  lungs legacy_scale                    kernel=sharp Harrell C  316      20  0.800
+  lungs     old_ckpt events <= 1y vs all controls (binary AUC) 1946      36  0.676
+  lungs     old_ckpt        1-y landmark (time > 1y) Harrell C 2007     121  0.598
+  lungs     old_ckpt                     kernel=soft Harrell C 1751     137  0.603
+  lungs     old_ckpt                    kernel=sharp Harrell C  316      20  0.694
+  lungs      new_bce events <= 1y vs all controls (binary AUC) 1946      36  0.734
+  lungs      new_bce        1-y landmark (time > 1y) Harrell C 2007     121  0.678
+  lungs      new_bce                     kernel=soft Harrell C 1751     137  0.678
+  lungs      new_bce                    kernel=sharp Harrell C  316      20  0.760
+sternum     new_main events <= 1y vs all controls (binary AUC) 1945      36  0.582
+sternum     new_main        1-y landmark (time > 1y) Harrell C 2006     121  0.524
+sternum     new_main                     kernel=soft Harrell C 1750     137  0.537
+sternum     new_main                    kernel=sharp Harrell C  316      20  0.523
+sternum legacy_scale events <= 1y vs all controls (binary AUC) 1945      36  0.522
+sternum legacy_scale        1-y landmark (time > 1y) Harrell C 2006     121  0.521
+sternum legacy_scale                     kernel=soft Harrell C 1750     137  0.524
+sternum legacy_scale                    kernel=sharp Harrell C  316      20  0.499
+sternum     old_ckpt events <= 1y vs all controls (binary AUC) 1945      36  0.486
+sternum     old_ckpt        1-y landmark (time > 1y) Harrell C 2006     121  0.507
+sternum     old_ckpt                     kernel=soft Harrell C 1750     137  0.503
+sternum     old_ckpt                    kernel=sharp Harrell C  316      20  0.497
+sternum      new_bce events <= 1y vs all controls (binary AUC) 1945      36  0.555
+sternum      new_bce        1-y landmark (time > 1y) Harrell C 2006     121  0.511
+sternum      new_bce                     kernel=soft Harrell C 1750     137  0.520
+sternum      new_bce                    kernel=sharp Harrell C  316      20  0.524
+
+Score correlations:
+   organ    covariate  spearman_rho     p
+  lungs    volume_ml         0.276 0.000
+  lungs   laa950_pct         0.248 0.000
+  lungs       mld_hu        -0.227 0.000
+  lungs    perc15_hu        -0.239 0.000
+  lungs sharp_kernel        -0.009 0.669
+  lungs          age         0.293 0.000
+  lungs         male        -0.048 0.031
+  lungs      cigsmok         0.211 0.000
+sternum    volume_ml         0.014 0.537
+sternum      mean_hu        -0.734 0.000
+sternum    median_hu        -0.757 0.000
+sternum sharp_kernel        -0.035 0.111
+sternum          age         0.211 0.000
+sternum         male        -0.131 0.000
+sternum      cigsmok         0.037 0.089
+
+HR per SD, adjusted:
+   organ                                    adjustment  hr_per_sd    lo    hi     p    n
+  lungs                                    unadjusted      1.873 1.614 2.174 0.000 2067
+  lungs                                      + kernel      1.872 1.613 2.172 0.000 2067
+  lungs                   + kernel + image covariates      1.917 1.614 2.278 0.000 2067
+  lungs                             + age/sex/smoking      1.684 1.432 1.980 0.000 2067
+  lungs                    + age/sex/smoking + kernel      1.682 1.431 1.978 0.000 2067
+  lungs + age/sex/smoking + kernel + image covariates      1.736 1.433 2.103 0.000 2067
+sternum                                    unadjusted      1.127 0.976 1.301 0.103 2066
+sternum                                      + kernel      1.124 0.974 1.298 0.110 2066
+sternum                   + kernel + image covariates      1.213 0.998 1.475 0.052 2066
+sternum                             + age/sex/smoking      1.012 0.867 1.181 0.877 2066
+sternum                    + age/sex/smoking + kernel      1.011 0.867 1.180 0.887 2066
+sternum + age/sex/smoking + kernel + image covariates      1.154 0.941 1.416 0.168 2066
+
+Reference / combined models:
+   organ                                                                          model fit_on  test_n  harrell_c   c_lo   c_hi  p_boot
+  lungs                                                          image covariates only  train    2067      0.562  0.518  0.609     NaN
+  lungs                                              clinical only (age, sex, smoking)  train    2067      0.645  0.599  0.688     NaN
+  lungs                                                    clinical + image covariates  train    2067      0.653  0.610  0.695     NaN
+  lungs                                                                 CNN score only    val    2067      0.688  0.652  0.724     NaN
+  lungs                                                         CNN + image covariates    val    2067      0.685  0.648  0.722     NaN
+  lungs                                                                 clinical + CNN    val    2067      0.704  0.666  0.740     NaN
+  lungs                                              clinical + CNN + image covariates    val    2067      0.697  0.658  0.733     NaN
+  lungs             Delta C: image covariates only - clinical only (age, sex, smoking)           2067     -0.083 -0.144 -0.016   0.018
+  lungs       Delta C: clinical + image covariates - clinical only (age, sex, smoking)           2067      0.008 -0.012  0.031   0.432
+  lungs                    Delta C: CNN score only - clinical only (age, sex, smoking)           2067      0.043 -0.008  0.094   0.112
+  lungs            Delta C: CNN + image covariates - clinical only (age, sex, smoking)           2067      0.040 -0.012  0.089   0.142
+  lungs                    Delta C: clinical + CNN - clinical only (age, sex, smoking)           2067      0.059  0.025  0.093   0.000
+  lungs Delta C: clinical + CNN + image covariates - clinical only (age, sex, smoking)           2067      0.052  0.018  0.085   0.004
+sternum                                                          image covariates only  train    2066      0.540  0.491  0.582     NaN
+sternum                                              clinical only (age, sex, smoking)  train    2066      0.645  0.599  0.690     NaN
+sternum                                                    clinical + image covariates  train    2066      0.639  0.593  0.684     NaN
+sternum                                                                 CNN score only    val    2066      0.538  0.491  0.584     NaN
+sternum                                                         CNN + image covariates    val    2066      0.556  0.511  0.601     NaN
+sternum                                                                 clinical + CNN    val    2066      0.645  0.599  0.690     NaN
+sternum                                              clinical + CNN + image covariates    val    2066      0.648  0.602  0.693     NaN
+sternum             Delta C: image covariates only - clinical only (age, sex, smoking)           2066     -0.105 -0.163 -0.045   0.000
+sternum       Delta C: clinical + image covariates - clinical only (age, sex, smoking)           2066     -0.006 -0.015  0.003   0.176
+sternum                    Delta C: CNN score only - clinical only (age, sex, smoking)           2066     -0.107 -0.165 -0.050   0.000
+sternum            Delta C: CNN + image covariates - clinical only (age, sex, smoking)           2066     -0.089 -0.146 -0.032   0.000
+sternum                    Delta C: clinical + CNN - clinical only (age, sex, smoking)           2066      0.000 -0.013  0.013   0.952
+sternum Delta C: clinical + CNN + image covariates - clinical only (age, sex, smoking)           2066      0.003 -0.011  0.016   0.718
+
+wrote data/c4_*.csv, figs/c4_*.png

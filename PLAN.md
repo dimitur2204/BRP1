@@ -54,6 +54,11 @@ difference between them is and *why* it exists. Explain every design choice
 - **C4 — evaluation** ✅ run 2026-09-29 (n-boot 1000, ~20 min on login node). Test C lungs 0.688
   [0.652, 0.724], sternum 0.538 [0.491, 0.584]; ΔC lungs−sternum 0.151. Sternum null after
   age/sex/smoking adjustment (HR/SD 1.01).
+- **C2b — training-curve reporting fix** ✅ (2026-10-02/03). Old curves mixed loss definitions
+  (batch-32 vs whole-split Cox risk sets; weighted vs unweighted BCE; online train C). New
+  eval-mode, same-definition metrics + diagnostics; `curves` run set (job 1361681) →
+  `figs/c2_training_curves/`. BCE val-loss spikes = stale BatchNorm running stats (global
+  logit offset, ranking intact; confirmed by re-estimating BN stats on a checkpoint). Doc §6.
 - **C5 — Grad-CAM** ✅ code. ⬜ **user: `sbatch src/submit_c5_gradcam.sh`** (C4 done).
 - **Doc + web page** 🔄 `docs/cnn3d_explained.md`: sections 0–9 written (9.6 Grad-CAM pending C5).
   The web page will be published after C5.

@@ -156,4 +156,60 @@ Validation C, mean [min–max] over seeds:
 - Pitfall: wait loops must use `kill -0 <pid>`. `pgrep -f <script>` matches
   the loop's own command line and never ends.
 
+**Figure review (2026-10-02).** An external review of the c* figures was checked against the code
+and run artifacts. All points held:
+- Cox curves: train loss used batch-local risk sets (32 pts), val the whole split. Zero-score
+  Cox loss is 3.24 (batch 32) vs 7.52 (val), 7.45 (whole train), which explains the "3.2 vs
+  7.5" gap entirely. Both curves were only ~0.1 below their own constant-score baseline.
+- BCE curves: train weighted by pos_weight, val unweighted. The val spikes (lungs legacy_scale
+  up to 45 at epoch 43, val C ~0.62) can't be diagnosed from what was saved: only the
+  selected-epoch model and preds exist.
+- Train C was the online, train-mode-BN, augmented number. The plots showed one seed without
+  saying so.
+- c3_val_grid.png: right-column y-labels covered the left column's cells.
+- KM: no CIs/at-risk tables, independent y-axes, no enriched-cohort caveat; sternum tertiles
+  not ordered (mid 61 events > high 58).
+
+Fixes:
+- `c2_train.py` logs optimisation loss (+ constant-score baseline) separately from an eval-mode,
+  unaugmented, same-definition evaluation loss on train and val (Cox whole-split risk sets /
+  unweighted BCE, each with its no-information baseline), eval-mode train C, and diagnostics
+  (val logit quantiles, BCE pos/neg contributions, top-1% share, BN running stats). New
+  `curves` run set (8 runs, 4 tasks): the plotted seeds re-trained full-length, plus
+  BN-batch-stat val pass and per-epoch checkpoints, no test preds, excluded by C4.
+- New `c2_plot_curves.py` → `figs/c2_training_curves/` + `data/c2_curves_spikes.csv`. The old
+  `figs/c4_training_curves/` was removed (misleading; in git history). C4 no longer copies curves.
+- `c3_select.py`: constrained layout, contrast-aware cell text. Re-run: the CSV/JSON are
+  byte-identical, only the PNG changed.
+- `c4_evaluate.py --figs-only` redraws figures without the bootstraps (~2 min). KM: 95% CI
+  bands, at-risk/events tables, one y-axis across all KM panels of both organs, enriched-cohort
+  footnote. Learning curve: seed-SD footnote, legacy SD bars where present.
+- Pre-existing bug: with a NaN selection score on every epoch (smoke val subset has no events)
+  `best_state` stayed None and the run crashed. Epoch 0 is now the fallback.
+- Doc §6 has a new "Training curves" subsection; §6 KM row, §9.2 learning curve, §9.4 sternum KM
+  updated.
+
+**Curves runs (job 1361681, 2026-10-03):** all 8 runs finished (60/80 epochs each, no errors).
+- Corrected curves: the lungs new recipe at its selected epoch has train C (eval) 0.720 vs val
+  0.657. Legacy_scale has 0.792 vs 0.671 and reaches train C 0.90 by epoch 22. The null runs
+  memorise permuted labels (train C 0.66, val ~0.5). Sternum barely learns (val Cox excess
+  −0.02 nats per event vs −0.17 for lungs).
+- Re-run nondeterminism: lungs main s1 selected epoch 48 (val C 0.657) vs epoch 5 (0.624) in
+  the original run.
+- **BCE spikes are stale BatchNorm running stats.**
+  - Lungs legacy_scale epoch 39: val median logit +31.4 (min +17.8). All of the loss comes from
+    negatives, the top-1% share is 1.5%, and val C is 0.631.
+  - The train eval-mode mean logit tracks the val median at r = 1.000, so this is not a val
+    shift. BN batch-stats val BCE excess is 1.18 vs 28.7.
+  - Decisive test (scratch `bn_recal.py`, CPU): re-estimating the running stats over all train
+    patients on the epoch-39 checkpoint moves the val median +31.4 → −2.3, BCE 29.1 → 1.22,
+    C 0.631 → 0.619. Epoch 40 (stored offset −14.7, low BCE because negatives dominate) recalibrates to −2.5, the same level.
+  - Mechanism: EMA momentum 0.1 over batch-8 batches under fast-changing Adam weights. BN4
+    error becomes a shared logit shift. The new recipe shows the same effect, smaller.
+- Rankings and C4 headline unaffected: an additive offset is invisible to Cox and C, and C4
+  val-standardises per seed. No architecture change needed. "Precise BN" would be the fix if
+  calibration is ever needed.
+- Old `c4_training_curves` remain deleted. Doc §6 now has the findings table and the spike
+  analysis.
+
 **Next:** user: `sbatch src/submit_c5_gradcam.sh` → doc §9.6 → web page.

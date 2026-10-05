@@ -258,7 +258,7 @@ and only for the pre-declared model groups.
 | **binary AUC** (event yes/no, time ignored) | The legacy metric | Reported only to compare with the old 0.687. It treats a patient censored at 2 years as a definite non-case. |
 | **HR per SD** | Cox hazard ratio for a 1-SD increase in the score, unadjusted and adjusted | A clinically readable effect size. The adjusted version is the key to section 8. |
 | **ΔC** (paired bootstrap) | C(model A) − C(model B) on the same test patients | Tests whether one model is really better. Paired because the two models share patients, which makes it much more precise than comparing two separate CIs. |
-| **KM curves + log-rank** | Test patients split into score tertiles; Kaplan–Meier cancer-free curves per tertile; multivariate log-rank test (the mentor's convention) | A visual endpoint. The p-value tests "are the curves different", not "how well does it rank". |
+| **KM curves + log-rank** | Test patients split into score tertiles; Kaplan–Meier cancer-free curves per tertile with 95% CI bands and numbers at risk; multivariate log-rank test (the mentor's convention) | A visual endpoint. The p-value tests "are the curves different", not "are they ordered low < mid < high", and not "how well does it rank". The y-axis is the **enriched** test cohort (all cancers + ~51% of controls, 7.6% events vs ~4% in NLST), so the curves are not population cancer-free probabilities; only the comparison between tertiles means something. All KM panels share one y-axis. |
 | **95% CI** | Event-stratified bootstrap (1,000 resamples; cases and controls resampled separately) | Honest uncertainty. |
 
 **Uncertainty is driven by the number of cancers, not patients.** With 18 test
@@ -266,6 +266,127 @@ cancers the legacy AUC 0.687 had a CI of [0.54, 0.83], ±0.14. With 157 test
 cancers the CI is roughly ±0.045 (≈ 1/√events scaling). That alone is a
 reason to distrust the old numbers: an AUC of 0.60 and one of 0.75 were both
 compatible with the 18-event test set.
+
+### Training curves: what each line means
+
+The original curves (`c2_train.py` before 2026-10-02) put numbers with
+different definitions on one axis, so the train–val gaps in them were not
+overfitting evidence:
+- **Cox loss.** Train loss used *batch-local* risk sets of 32 patients;
+  val loss used the whole val split (~2,046). The Cox loss of a constant
+  score is the mean log risk-set size: **3.24** for a batch of 32 vs
+  **7.52** for the val split (7.45 for the whole train split). The
+  "3.2 vs 7.5" gap was this baseline, not overfitting. Both curves sat only
+  ~0.1 below their own constant-score baseline.
+- **BCE loss.** Train BCE was weighted by `pos_weight` (≈ 2), val BCE was
+  unweighted.
+- **Train C** came from the outputs produced *during* the epoch: weights
+  changing batch to batch, BatchNorm in training mode, augmentation on.
+  Val C came from one frozen model in eval mode.
+
+`c2_train.py` now logs, per epoch:
+- the **optimisation loss** (what the optimiser saw, as above) and the same
+  loss for a constant score, kept separate and labelled as such;
+- an **evaluation loss** with one definition for both splits: model frozen
+  in `eval()` mode, no augmentation, Cox with whole-split risk sets or
+  *unweighted* BCE. Each is plotted minus its no-information baseline (Cox:
+  the constant-score loss; BCE: the entropy of the split's prevalence), so
+  0 means "no better than knowing nothing". The BCE baselines differ by split
+  (33% vs 7.7% events), and a `pos_weight`-trained logit is miscalibrated for
+  unweighted BCE, so a positive BCE excess on val can mean miscalibration
+  with intact ranking;
+- **train C from the same frozen eval pass**, comparable to val C. The
+  online train C is kept, labelled "online";
+- diagnostics: val logit quantiles, the BCE loss split into positives and
+  negatives and the share from the worst 1% of patients, BatchNorm running
+  means/variances, and (in the `curves` set) val loss/C recomputed with
+  BatchNorm using batch statistics instead of running averages.
+
+The figures (`figs/c2_training_curves/`, from `c2_plot_curves.py`) come from
+the `curves` run set. It re-trains the plotted seed of new_main, new_bce,
+null (seed 1) and legacy_scale (seed 0) per organ for the full epoch budget,
+marks the epoch early stopping would have chosen, and saves a checkpoint per
+epoch. Its models are never evaluated on test and it writes no test
+predictions. Each figure shows **one seed**. The headline results use the
+seed ensembles (5 seeds; legacy_scale 3).
+
+**What the corrected curves show** (`curves` runs, job 1361681, one seed
+each, run to the full epoch budget):
+
+| run | selected epoch | train C (eval) | val C | eval-loss excess train / val |
+|---|---|---|---|---|
+| lungs new_main (Cox) | 48 | 0.720 | 0.657 | −0.32 / −0.17 |
+| lungs new_bce | 60 | 0.720 | 0.651 | +0.20 / −0.00 |
+| lungs legacy_scale | 12 | 0.792 | 0.671 | −0.09 / +0.39 |
+| sternum new_main (Cox) | 21 | 0.567 | 0.555 | −0.03 / −0.02 |
+| sternum legacy_scale | 13 | 0.573 | 0.560 | +0.01 / +0.08 |
+
+- **The gaps are now real overfitting.** With train C from a frozen
+  eval-mode pass, the lungs new recipe has a modest gap at the selected
+  epoch (0.72 vs 0.66). Train C keeps rising to 0.78 by epoch 79, while val
+  C plateaus at ~0.64 and the val Cox excess drifts up past 0. The
+  legacy recipe overfits much harder: train C 0.90 by epoch 22 while val C
+  falls to ~0.62.
+- **The null runs memorise noise.** On permuted labels, train C rises to
+  0.66 while val C stays at 0.49–0.54. Train C is never evidence of signal.
+- **Sternum barely learns anything.** Its best val Cox excess is −0.02 nats
+  per event (lungs: −0.17).
+- **Selection noise again.** The re-run of lungs new_main seed 1 picked
+  epoch 48 (val C 0.657). The original run with the same config and seed
+  picked epoch 5 (0.624): GPU non-determinism changed the trajectory, and
+  early stopping on a val C that swings ±0.03 per epoch does the rest. These
+  re-runs are for figures only; the headline models are unchanged.
+
+**The BCE val-loss spikes: stale BatchNorm running statistics.** The
+re-run reproduced them (lungs legacy_scale: val BCE up to 29 at epoch 39;
+`data/c2_curves_spikes.csv`). Each candidate explanation was tested:
+- **A global logit shift with ranking intact: yes.** At epoch 39 the val
+  logit median is +31.4 (min +17.8). Every val patient is pushed far to the
+  "cancer" side, so all the loss comes from the 92% negatives and none from
+  the positives. Val C stays at 0.631. The eval-mode logit swings
+  between −64 and +31 from one epoch to the next.
+- **A few extreme patients: no.** The worst 1% of patients carry 1.5–2.8%
+  of the loss at the spike epochs. That is spread across everyone.
+- **Specific to val: no.** The train-set mean logit in eval mode tracks
+  the val median exactly (r = 1.000 over epochs; train eval BCE 19.1 at
+  epoch 39). This is not a train/val distribution shift.
+- **BatchNorm running statistics: yes.** With the same weights but
+  BatchNorm normalising each batch with its own statistics, the epoch-39 val
+  BCE excess is 1.18 instead of 28.7 and the mean logit is −1.4. The
+  decisive test re-estimated the running statistics on the epoch-39
+  checkpoint (cumulative average over all 2,189 train patients, current
+  weights). The val logit median goes from +31.4 to −2.3, val BCE from 29.1
+  to 1.22, and val C from 0.631 to 0.619. At epoch 40 the stored stats
+  give the opposite offset (median −14.7); recalibrated, it is −2.5, the
+  same level as epoch 39. The stored running averages, not the weights,
+  produce the offset. A negative offset barely raises BCE, because 92% of
+  val patients are negatives. That is why the spikes in the curves only go
+  upward.
+- **Why the running statistics are off.** BatchNorm keeps an exponential
+  moving average (momentum 0.1) of batch statistics over roughly the last
+  10–20 batches. The legacy recipe uses batches of 8 and plain Adam at
+  1e-3, so those averages come from ~100 patients measured under weights
+  that changed during those very batches. The last block's running stats
+  (BN4 in the diagnostics figure) jump around from epoch to epoch, and
+  any error there passes through ReLU and the final linear layer as a
+  shared shift of every logit. The new recipe (batch 32, AdamW) shows the
+  same mechanism, smaller: lungs new_bce val BCE excess up to 6.1, 0.52
+  with batch statistics.
+
+**Consequences.**
+- **Rankings are essentially unaffected.** An additive offset changes
+  neither the Cox loss nor any C-index. C4 standardises each seed's η on
+  val before ensembling, which removes it. Recalibrating BatchNorm moved val
+  C by ≤ 0.012. The headline results stand.
+- **The eval-mode BCE of these models is not a calibration measure.**
+  Absolute logits from the legacy model are meaningless. That was already
+  the case for other reasons (pos_weight, prevalence shift), and none are
+  reported.
+- **No architecture change is warranted for the current aims.** If
+  calibrated outputs are ever needed, the standard fix is to re-estimate
+  BatchNorm statistics on the training set before evaluation ("precise
+  BN"). Larger batches or GroupNorm are the alternatives. Nothing here
+  requires it.
 
 ---
 
@@ -430,7 +551,9 @@ What each step says:
 4. **The new recipe adds little on top at this scale.**
    - The gain is **+0.008** [−0.022, 0.041] (p = 0.60): not distinguishable
      from zero (step 4 → 5).
-   - The learning curve (`figs/c4_learning_curve.png`) shows why. At 179
+   - The learning curve (`figs/c4_learning_curve.png`; error bars are the SD
+     of single-seed test C across seeds, not CIs; the legacy line only
+     joins its two measured sizes, 179 and 2,189) shows why. At 179
      patients the new recipe is *worse* than the legacy one (0.607 vs
      0.630): 2 channels, isotropic grid, more parameters to fit. It overtakes
      by full size (per-seed mean 0.673 vs 0.662), and is still rising.
@@ -520,7 +643,10 @@ this as a direction, not a result.
 ### 9.4 Why the sternum model "almost works", and why that is a confound
 
 - Unadjusted, the new sternum model looks weakly positive: C 0.538, and the
-  KM tertiles separate at **log-rank p = 0.035**.
+  KM tertiles separate at **log-rank p = 0.035**. That separation is weak
+  and **not ordered**: the mid tertile has more events than the high one
+  (61 vs 58), and their curves overlap within their CIs. Only the low
+  tertile stands apart. It is not evidence of reliable risk ordering.
 - A naive reading would say "the negative control failed". Section 8
   predicted the explanation, and the data confirm it:
   - The score is **ρ = −0.76 with the sternum's median HU**. The model has
