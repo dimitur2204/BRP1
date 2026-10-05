@@ -1,3 +1,0 @@
-organ,n_train,n_pos_train,n_val,n_test,val_auc,test_auc,test_confusion
-lungs,180,84,93,127,0.6807,0.6871,"[[95, 14], [12, 6]]"
-sternum,180,84,92,127,0.6719,0.607,"[[109, 0], [18, 0]]"

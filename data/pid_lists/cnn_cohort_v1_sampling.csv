@@ -1,4 +1,0 @@
-split,manifest_cases,manifest_controls,enriched_cases,enriched_controls,case_sampling_rate,control_sampling_rate,manifest_event_rate,enriched_event_rate
-train,742,17635,742,1484,1.0,0.084,0.04,0.333
-val,159,3778,159,1908,1.0,0.505,0.04,0.077
-test,160,3780,160,1920,1.0,0.508,0.041,0.077

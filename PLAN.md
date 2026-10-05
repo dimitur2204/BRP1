@@ -1,68 +1,34 @@
-# 3D CNN on lungs + sternum → lung-cancer risk: retrain at scale, fix, explain
+# Lungs 3D CNN on NLST: baseline from scratch
 
-Branch `cnn3d-lungs-sternum` (from `main` b423d60). The heart-radiomics work
-lives on `heart-radiomics` / `thymus-heart-aging`; the original 7-organ CNN
-pipeline is in git history (`eb3b89b`).
+Branch `cnn3d-lungs-cox` (from `cnn3d-lungs-sternum` 7382553), 2026-10-05. All previous code, cohorts,
+caches and results were deleted (they are in git history up to `7382553`).
+Design and rationale: `docs/pipeline.md`.
 
-## Question
+## Goal
 
-The legacy 3D CNN (400-patient subset, 18 test cancers) reported lungs test
-AUC 0.687 [0.54, 0.83] and sternum 0.607. Retrain it on the full enriched
-cohort (6,306 pts / 1,037 cancers; test 2,067 / 157), on **lungs (positive
-control) and sternum (negative control) only**. Find out how big the real
-difference between them is and *why* it exists. Explain every design choice
-(`docs/cnn3d_explained.md` plus a published web page).
+A working, simple 3D CNN that reads the lungs on the NLST baseline CT and
+predicts time to lung cancer (Cox loss). It is a base to build on, so there is
+no hyperparameter grid.
 
-## Decisions (user, 2026-09-28)
+## Decisions (user, 2026-10-05)
 
-- Cohort: the enriched 6.3k (same pids as `heart-radiomics:heart_cohort_v1.csv`).
-  The mentor's split is reused.
-- Objective: Cox partial likelihood as primary, BCE as an ablation.
-- Output: repo markdown plus a web page.
-- Cleanup: 2D CNN, other 5 organs and the multi-organ ranking are removed. Old
-  lungs/sternum numbers and figures are kept in `data/legacy_400/` and
-  `figs/legacy_400/`.
-
-## Legacy recipe defects being fixed
-
-1. Every crop is squashed to a 64³ cube, so volume and shape are lost.
-2. The sternum used the soft-tissue window [−160, 240], saturating most of
-   the bone. The negative control was blinded.
-3. Outside-mask voxels were set to −1000 HU, the same as emphysematous lung,
-   with no mask channel.
-4. BCE ignores time and censoring.
-5. Selection used the best val AUC over 60 epochs on 18 val cancers: no early
-   stopping, one seed, no augmentation.
-6. Results were read off a 0.5 threshold, which is meaningless under
-   `pos_weight` and the prevalence shift.
-7. Hanley–McNeil CIs were used instead of the bootstrap.
-8. The crop bbox was never stored.
+- Input: lungs only, from TotalSegmentator masks. This limits the cohort to
+  patients with masks (all cancers, ~63% of controls).
+- Outcome: time-to-event, Cox partial likelihood.
+- New cohort and a fresh random split. Nothing from the old pipeline is reused.
+- `learn/` (teaching workspace, git-excluded) is kept.
 
 ## Stages
 
-- **C0 — cohort** ✅ `src/c0_build_cohort.py` → `data/pid_lists/cnn_cohort_v1{,_attrition,_sampling}.csv`.
-  6,306 / 1,037 events, pid-identical to heart_cohort_v1. Clinical columns
-  are complete (the user downloaded the TCIA prsn package; the "has
-  age/sex/smoking" step dropped nobody).
-- **C1 — input cache** ✅ code, smoke-tested (legacy path matches the old
-  cache to within 2.4e-4). ✅ run, merged and QC'd 2026-09-29 (lungs 6,302,
-  sternum 6,296 pids cached).
-- **C2 — training** ✅ code, CPU smoke-tested (grid, legacy, score_old, final
-  sets). Cox loss verified. ✅ grid (34 runs, job 1053159) and final (46 runs, job 1073738) done 2026-09-29.
-- **C3 — selection** ✅ run → `data/c3_chosen_configs.json` (lungs lr 3e-4 / wd 1e-2 / do 0;
-  sternum lr 1e-3 / wd 1e-2 / do 0).
-- **C4 — evaluation** ✅ run 2026-09-29 (n-boot 1000, ~20 min on login node). Test C lungs 0.688
-  [0.652, 0.724], sternum 0.538 [0.491, 0.584]; ΔC lungs−sternum 0.151. Sternum null after
-  age/sex/smoking adjustment (HR/SD 1.01).
-- **C2b — training-curve reporting fix** ✅ (2026-10-02/03). Old curves mixed loss definitions
-  (batch-32 vs whole-split Cox risk sets; weighted vs unweighted BCE; online train C). New
-  eval-mode, same-definition metrics + diagnostics; `curves` run set (job 1361681) →
-  `figs/c2_training_curves/`. BCE val-loss spikes = stale BatchNorm running stats (global
-  logit offset, ranking intact; confirmed by re-estimating BN stats on a checkpoint). Doc §6.
-- **C5 — Grad-CAM** ✅ code. ⬜ **user: `sbatch src/submit_c5_gradcam.sh`** (C4 done).
-- **Doc + web page** 🔄 `docs/cnn3d_explained.md`: sections 0–9 written (9.6 Grad-CAM pending C5).
-  The web page will be published after C5.
+- **S1 candidates** ✅ `src/s1_candidates.py` → 16,543 pts / 1,047 events.
+- **S2 preprocess** ✅ code, smoke-tested (40 pids, chunk → merge identical).
+  ⬜ **user: `sbatch src/submit_s2_preprocess.sh`**, then `--merge`, `--qc`.
+- **S3 cohort** ✅ code, smoke-tested. ⬜ run after the S2 merge.
+- **S4 train** ✅ code, CPU smoke-tested. Cox loss verified. ⬜ **user:
+  `sbatch src/submit_s4_train.sh`** after S3.
+- **S5 evaluate** ✅ code, smoke-tested. ⬜ run after S4.
 
 ## Open items
 
-- None besides the pending Slurm runs.
+- First GPU run: check the epoch time and GPU memory in `logs/s4_*.out`.
+  The 12 h limit and 96 GB of RAM are estimates.

@@ -1,33 +1,22 @@
 # Python virtual environment (~5.5GB) -- regenerate with:
-#   python3 -m venv env/.venv && env/.venv/bin/pip install numpy nibabel matplotlib \
-#     pandas scipy torch scikit-learn lifelines
-# (CUDA torch build for the sbatch jobs: `pip install torch`, no --index-url;
-# see PROGRESS.md for the CPU-vs-CUDA build history.)
+#   python3 -m venv env/.venv && env/.venv/bin/pip install numpy==1.26.4 nibabel \
+#     matplotlib pandas scipy torch scikit-learn lifelines scikit-survival
 env/
 
-# Legacy 400-patient native-resolution crops (~14GB) from the old pipeline's
-# cache_organ_crops.py (git history, commit eb3b89b). Not used by the c* scripts.
-data/organ_crops/
-
-# Legacy 3D CNN checkpoints (old stage3_cnn3d.py, 400-patient subset) -- kept
-# on disk because c4_evaluate.py re-scores lungs/sternum on the big test set.
-models/*.pt
-
-# C1 CNN input cache (~20GB: {organ}_iso.npy, {organ}_legacy64.npy, index CSVs)
-# -- regenerate with:
-#   sbatch src/submit_c1_cache.sh && env/.venv/bin/python src/c1_cache_volumes.py --merge
-data/cnn_cache/
-
-# C2 training runs (config/history/predictions/checkpoints) -- regenerate with
-#   sbatch src/submit_c2_train.sh grid ; env/.venv/bin/python src/c3_select.py ;
-#   sbatch src/submit_c2_train.sh final
-runs/
-
-# Public NLST IDC-780 clinical package (TCIA, CC BY 4.0) for age/sex/smoking --
-# see docs/cnn3d_explained.md ("Clinical covariates") for how to obtain it.
+# Public NLST IDC-780 clinical package (TCIA, CC BY 4.0): outcome + age/sex/smoking.
+# Regeneration command: docs/pipeline.md, section 6.
 data/external/
 
-# Slurm job logs -- ephemeral, recreated per job submission
+# S2 lung-volume cache (~39 GB uint8 memmap + per-task chunks) -- regenerate with:
+#   sbatch src/submit_s2_preprocess.sh && env/.venv/bin/python src/s2_preprocess.py --merge
+data/cache/
+
+# S4 training runs (config/history/pred/model/curves) -- regenerate with:
+#   sbatch src/submit_s4_train.sh
+runs/
+models/*.pt
+
+# Slurm job logs
 logs/*.out
 logs/*.err
 
@@ -39,6 +28,3 @@ __pycache__/
 *.swp
 *.swo
 *.un~
-
-# Grad-CAM volumes (.nii.gz) -- regenerate via src/submit_c5_gradcam.sh
-data/saliency/
