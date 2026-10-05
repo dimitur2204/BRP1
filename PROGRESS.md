@@ -49,5 +49,10 @@ Running log. Plan/status: `PLAN.md`. Design: `docs/pipeline.md`.
   there are no events or no comparable pairs; time-dependent AUC is NaN for
   horizons outside a split's follow-up.
 
-**Next:** user: `sbatch src/submit_s2_preprocess.sh` → `--merge` → `--qc` →
+**S2 array run (job 1681218):** all 40 tasks done with empty stderr; median 1.0 s/pid
+(max 16 s). 16,515/16,543 ok. The 28 failures are all `ValueError: empty lung mask`
+(TotalSegmentator found no lobes) and S3 excludes them. Chunks total 39.0 GB
+apparent size; `du` shows ~0.4 GB because the filesystem compresses mostly-zero data.
+
+**Next:** user: `s2_preprocess.py --merge` → `--qc` →
 `s3_cohort.py` → `sbatch src/submit_s4_train.sh` → `s5_evaluate.py --run baseline`.

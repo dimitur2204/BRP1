@@ -1,0 +1,11 @@
+step,n,events,event_rate
+NLST participants (IDC-780 prsn),53452,2058,0.0385
+baseline CT series in IDC scan list,26254,1061,0.0404
+series is study year 0,25868,1047,0.0405
+resampled CT on disk,25861,1047,0.0405
+TotalSegmentator mask on disk,16618,1047,0.063
+follow-up > 0 days after T0,16543,1047,0.0633
+preprocessing ok,16515,1046,0.0633
+lung z-extent >= 200 mm,16350,1034,0.0632
+lung volume >= 1500 mL,16348,1034,0.0632
+clipped lung <= 2%,16345,1034,0.0633

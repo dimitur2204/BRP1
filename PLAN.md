@@ -21,8 +21,8 @@ no hyperparameter grid.
 ## Stages
 
 - **S1 candidates** ✅ `src/s1_candidates.py` → 16,543 pts / 1,047 events.
-- **S2 preprocess** ✅ code, smoke-tested (40 pids, chunk → merge identical).
-  ⬜ **user: `sbatch src/submit_s2_preprocess.sh`**, then `--merge`, `--qc`.
+- **S2 preprocess** ✅ code, smoke-tested. ✅ array run (job 1681218): 16,515 ok, 28 empty lung masks.
+  ⬜ **user: `s2_preprocess.py --merge`, then `--qc`.**
 - **S3 cohort** ✅ code, smoke-tested. ⬜ run after the S2 merge.
 - **S4 train** ✅ code, CPU smoke-tested. Cox loss verified. ⬜ **user:
   `sbatch src/submit_s4_train.sh`** after S3.
