@@ -1,0 +1,5 @@
+covariates,n_features,cv_auc
+clinical,5,0.5036148781516621
+scanner,16,0.5096170972539498
+clinical+scanner,21,0.5094175151995269
+"admin (old split, pid)",3,0.5664091326198799
