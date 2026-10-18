@@ -54,3 +54,72 @@ no hyperparameter grid.
 
 - Discussed, not built: select the epoch by val loss; a reference Cox model of
   lung volume + age.
+
+# Next: self-supervised pretraining (DINOv2-3D-Med), branch `ssl-dino`
+
+Branch `ssl-dino` (from `cnn3d-lungs-cox` cd6940c), 2026-10-18. Background and findings in
+PROGRESS (2026-10-18).
+
+## Goal
+
+Pretrain a 3D ViT with DINOv2 ([AIM-Harvard/DINOv2-3D-Med](https://github.com/AIM-Harvard/DINOv2-3D-Med),
+no released weights) on NLST lungs **without labels and without test patients**, then predict time to
+cancer from its features. Bar to clear (S5, test, 155 events): `cosine` η alone C 0.648; clinical
+0.654 → clinical + η 0.675, ΔC +0.021 [−0.017, +0.058]. Success = clinical + DINO with a ΔC CI > 0,
+or clearly above `cosine`.
+
+## Decisions (user, 2026-10-18)
+
+- DINOv2-3D-Med trained by us, not CT-FM (CT-FM's pretraining set is 128,037/~148k NLST scans, so
+  it has seen our test scans).
+- Input: the existing S2 cache (2.5 mm, 144×128×128, lung-masked uint8). Same input as `cosine`, so
+  the comparison isolates "self-supervised vs supervised". At 2.5 mm the whole lung is one forward
+  pass (patch 8³ → 18×16×16 = 4,608 tokens), so one embedding per patient, no tiling/pooling.
+  Finer-scale (nodule-level) crops are a later variant, only if this works.
+
+## Stages (proposed; scripts follow the `s{N}_*.py` / `submit_s{N}_*.sh` style)
+
+- **D0 setup** ⬜ Clone the repo pinned at `77bde4d` into `ext/DINOv2-3D-Med` (gitignored;
+  regeneration command in `docs/pipeline.md`). It needs Python ≥ 3.11 (torch 2.7.1, MONAI 1.4,
+  Lightning 2.5, lightly, dynamic-network-architectures), so a second venv `env/.venv-dino` built
+  with `uv`; `env/.venv` (3.9) stays for S1–S6. Run the repo's own tests on CPU.
+  W&B logger → offline mode (or CSV) unless compute nodes have internet.
+- **D1 data adapter** ⬜ `src/s7_dino_data.py`: a Dataset over `lungs_u8.npy` rows of
+  `cohort.csv` split ∈ {train, val} (13,893 scans), with a hard assert that no test pid is
+  present; returns float [0, 1] (0 = outside the lung, as in the cache). Our own config
+  `configs/dino/nlst_2p5mm.yaml` replaces the repo's NIfTI loading/spacing/HU transforms and keeps
+  `DINOv2Augmentation3D`. Check: the crop scales keep the effective voxel size near 2.5 mm (views
+  are resized to 96³ / 24³, which also changes scale), and crops land on lung. QC figure of
+  global/local views, as for S2.
+- **D2 smoke + throughput** ⬜ `src/submit_s8_dino_pretrain.sh` on `gpu-short` (1 L40S, < 2 h):
+  s/step, GPU memory, GPU utilisation (≥ 75% or GenomeDK cancels the job; CPU-side 3D
+  augmentation may bottleneck), collapse metrics (effective rank, teacher entropy, Gram matrix)
+  moving the right way. Then fix the model size (default PRIMUS-M: 864-dim, depth 16; a smaller
+  one may suit ~14k scans and one GPU), batch × accumulation, and the number of epochs.
+- **D3 pretrain** ⬜ the same script on `gpu` (12 h jobs), chained with
+  `--dependency=afterany` and resumed from `last.ckpt`. Keep checkpoints at intervals so feature
+  quality can be probed against pretraining length. Stop early if D5 on an intermediate checkpoint
+  is no better than random-init features.
+- **D4 features** ⬜ `src/s9_dino_features.py`: teacher backbone, full 144×128×128 volume at
+  2.5 mm, for **all** cohort patients → CLS token + mean patch token per patient, saved in
+  cohort-row order (`data/features/{run}/{ckpt}.npy`). Also a random-init backbone (control).
+- **D5 linear probe** ⬜ `src/s10_dino_probe.py`: penalised Cox on the features (fit on train,
+  penalty chosen by val C), writes `runs/{name}/pred.csv` in the S4 format, so
+  `s5_evaluate.py` runs unchanged (incl. `--added-only`). Compare on the same split: random-init
+  features, DINO checkpoints, `cosine`, clinical. Test is read only by S5.
+- **D6 fine-tune (optional)** ⬜ the backbone + a linear Cox head trained with `cox_loss`
+  (S4-style, low lr, layer decay), vs the same ViT trained from scratch.
+
+## Open items (D0)
+
+Checked on GenomeDK 2026-10-18:
+- No Python ≥ 3.11 and no `uv` (system python3 is 3.9.25). D0 installs `uv` to `~/.local/bin`;
+  `uv` downloads its own Python for `env/.venv-dino`.
+- Later screening rounds exist: `ct_1x1x2mm/{pid}_yr1/yr2.nii.gz` and `totalseg_fullres/{pid}_yr1/yr2`
+  (checked for pid 100002 only). ⬜ Count them for cohort pids. If most exist, the pretraining
+  pool could roughly triple (non-test patients only; needs S2 on those scans, its own cache).
+- `gpu-h200` (2 nodes × 4 H200, max 7 days) has AllowAccounts=ALL, so it should accept
+  `aura_thymus`; confirm with the D2 job. `gpu` / `gpu-l40s` also allow 7 days (S4 used 12 h by choice).
+- No W&B account (user) → `WANDB_MODE=disabled`, Lightning `CSVLogger`; check the repo's collapse
+  callbacks log to it.
+- ⬜ GPU budget for D3.

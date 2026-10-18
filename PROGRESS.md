@@ -327,3 +327,34 @@ that excludes 0. Power is limited by 155 test events (detectable ΔC ~0.04). Che
 η with information not in the clinical variables → ΔC +0.035 [0.020, 0.050]; η built from the clinical
 variables only → ΔC −0.003 [−0.006, +0.001], p 0.93. Also new: `--out` (no overwrite of eval/),
 `--added-only`, `--clinical`, `--fit-split`.
+
+## 2026-10-18: self-supervised pretraining, branch `ssl-dino`
+
+New branch `ssl-dino` from `cnn3d-lungs-cox` (cd6940c). Plan: PLAN.md "Next: self-supervised
+pretraining".
+
+**CT-FM rejected as the main model: it was pretrained on NLST.** Pai et al., arXiv 2501.09001,
+Suppl. Table S5: `nlst` = 128,037 of ~148,000 pretraining scans ("a majority of the dataset is
+comprised of the NLST cohort"). The IDC selection query (Suppl. S1) filters only on CT, slice
+thickness 1–5 mm, > 50 slices, no localiser; no collection is excluded. So CT-FM has seen our test
+scans (no labels, but not unseen images).
+
+**DINOv2-3D-Med (pinned `77bde4d`, 2026-08-04), read in full.** No released weights; README:
+"has not been extensively benchmarked"; eight `configs/experiments/` files deal with collapse
+(lower lr, faster centring, smaller head), so collapse happened to the authors too. Defaults:
+PRIMUS-M (EVA ViT, 864-dim, depth 16, 12 heads, patch 8³, RoPE + learned abs. position embedding),
+96³ global / 24³ local views, 4 local views, 4 GPUs × batch 5 × accumulation 6, 150 epochs of
+250 steps, fp16, W&B logging, 1 mm isotropic NIfTI via MONAI. The backbone takes any input size
+(abs. position embedding resampled, RoPE built per D/H/W), so a crop-trained model can embed the
+whole 144×128×128 lung. `configs/predict.yaml` is stale (refers to modules that no longer exist);
+`scripts/eval/extract_features_radchestct.py` (CLS token from the student backbone, whole volume
+resized to 160³) is the usable template for D4. Requires Python ≥ 3.11 → separate venv.
+
+**Decided (user):** train DINOv2-3D-Med ourselves on the 2.5 mm S2 cache, no test patients in
+pretraining. Why 2.5 mm: the ViT does not know the spacing, only consistency matters; at 2.5 mm
+the whole lung fits one pass, so there is one embedding per patient and no crop pooling. Cost: 4–6
+mm nodules are ~2 voxels, the same view as `cosine` (which S6 showed learns lung size/inflation).
+
+**Cluster checks (2026-10-18).** No Python ≥ 3.11 or `uv` on GenomeDK (python3 3.9.25).
+`{pid}_yr1/yr2` CT + TotalSegmentator folders exist (pid 100002). `gpu-h200`: 2 nodes × 4 H200,
+AllowAccounts=ALL, max 7 days. No W&B account → CSV logging.
