@@ -26,6 +26,8 @@ it is reused: no cohort, no split, no cache, no code.
 | S7 SSL scans | `src/s7_ssl_cache.py --list`, `submit_s7_ssl_cache.sh` (40 CPU tasks), `--merge` | login node + Slurm | `data/cache/rounds_u8.npy`, `data/ssl_scans.csv` |
 | D1 views | `src/dino_data.py` (`--qc`) | used by S8; QC on login node | `figs/d1_views.png` |
 | S8 DINOv2 pretrain | `src/s8_dino_pretrain.py` via `submit_s8_dino_pretrain.sh` (1 GPU) | Slurm | `runs/dino/{name}/` |
+| S9 DINOv2 features | `src/s9_dino_features.py` via `submit_s9_dino_features.sh` (1 GPU) | Slurm | `data/features/{run}/{ckpt}.npy` |
+| S10 Cox probe | `src/s10_dino_probe.py` (`--summary`) | login node, minutes | `runs/probe_*/` (S4 format → S5) |
 
 Shared code: `src/nlst.py` (paths and the whole input definition) and
 `src/model.py` (network, Cox loss, C-index, augmentation).
@@ -357,6 +359,9 @@ Plan and status: `PLAN.md` (D0–D6).
 | backbone | PRIMUS-M (EVA ViT, 864-dim, depth 16, patch 8³, RoPE + learned position embedding; 146 M parameters) | repo default; it accepts any input size, so the whole 144×128×128 lung (4,608 tokens) is one forward pass at extraction (D4): one embedding per patient, no crop pooling. A smaller ViT is compared in D2 |
 | training | repo recipe (`train.yaml`: base lr 0.004 × √(batch/1024), layer decay 0.9, wd 0.04→0.2, 10 warm-up epochs, teacher EMA 0.992→1); 1 GPU, bf16 | the schedules depend on `max_epochs` × steps per epoch, so a run must keep them fixed when it resumes (S8 checks) |
 | logging | Lightning CSVLogger, `runs/dino/{name}/metrics.csv`; the repo's collapse monitors (Gram matrix, teacher entropy, effective rank) re-routed from W&B by `src/dino_callbacks.py`; throughput (s/batch, share waiting for data, GPU memory) | no W&B account |
+
+| features (S9) | teacher backbone, whole yr0 volume 144×128×128 at 2.5 mm, no augmentation → [CLS, mean of the 4,608 patch tokens] | the teacher (EMA) is the usual DINO feature extractor; the whole lung in one pass gives one vector per patient. `random` (same backbone, random weights) is the control |
+| probe (S10) | z-score on train → elastic-net Cox (l1_ratio 0.5, 50 penalties) on train → penalty by val Harrell C → η for all patients in `pred.csv` | answers "is cancer risk in the frozen features?" with the backbone untouched. Same split, time and event as S4, and the S4 output format, so S5 evaluates it unchanged; S10 itself never computes a test metric. Conservative: on synthetic data, 126 noise columns cost ~0.03 C (PROGRESS 2026-10-19) |
 
 Repo quirks found while wiring it up (2026-10-19):
 
