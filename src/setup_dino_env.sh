@@ -51,6 +51,7 @@ cd "$REPO"
 uv python install 3.11
 uv sync --frozen --python 3.11
 PY=$UV_PROJECT_ENVIRONMENT/bin/python
+uv pip install --python "$PY" --quiet pandas==2.2.3   # for src/dino_data.py (not in the repo's lock)
 $PY --version
 
 # 4. checks (CPU)

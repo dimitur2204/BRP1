@@ -41,9 +41,10 @@ from nlst import (AIR_HU, CACHE_DIR, CACHE_INDEX, CACHE_NPY, CANDIDATES_CSV, CT_
 CHUNK_DIR = CACHE_DIR / "chunks"
 
 
-def preprocess(pid: str) -> tuple[np.ndarray, dict]:
-    ct_img = nib.as_closest_canonical(nib.load(CT_DIR / f"{pid}_yr0.nii.gz"))
-    seg_img = nib.as_closest_canonical(nib.load(SEG_DIR / f"{pid}_yr0" / "seg.nii.gz"))
+def preprocess(pid: str, rnd: str = "yr0") -> tuple[np.ndarray, dict]:
+    """rnd = screening round; S2 itself only uses yr0, s7 (SSL) also yr1/yr2."""
+    ct_img = nib.as_closest_canonical(nib.load(CT_DIR / f"{pid}_{rnd}.nii.gz"))
+    seg_img = nib.as_closest_canonical(nib.load(SEG_DIR / f"{pid}_{rnd}" / "seg.nii.gz"))
     ct = np.asarray(ct_img.dataobj, dtype=np.float32)
     seg = np.asarray(seg_img.dataobj)
     if ct.shape != seg.shape:
@@ -82,12 +83,16 @@ def preprocess(pid: str) -> tuple[np.ndarray, dict]:
 
 
 def run_pids(pids: list[str]) -> tuple[np.ndarray, pd.DataFrame]:
+    return run_pids_rounds(pids, ["yr0"] * len(pids))
+
+
+def run_pids_rounds(pids: list[str], rounds: list[str]) -> tuple[np.ndarray, pd.DataFrame]:
     arr = np.zeros((len(pids), *GRID), dtype=np.uint8)
     rows = []
-    for i, pid in enumerate(pids):
+    for i, (pid, rnd) in enumerate(zip(pids, rounds)):
         t = time.time()
         try:
-            arr[i], qc = preprocess(pid)
+            arr[i], qc = preprocess(pid, rnd)
         except Exception as e:  # recorded, excluded in s3
             qc = {"status": f"error: {type(e).__name__}: {e}"}
         rows.append({"pid": pid, **qc, "sec": round(time.time() - t, 2)})

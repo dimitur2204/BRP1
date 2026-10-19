@@ -1,0 +1,56 @@
+# DINOv2 pretraining on the NLST 2.5 mm lung volumes (D2/D3). Applied after the repo's
+# ext/DINOv2-3D-Med/configs/train.yaml and configs/models/primus.yaml (later files override
+# `a#b` keys). Our modules (src/dino_data.py, src/dino_callbacks.py) are found via PYTHONPATH=src,
+# set by src/submit_s8_dino_pretrain.sh. Design notes: docs/pipeline.md, PLAN.md (D1-D3).
+project: "/faststorage/project/aura_thymus/student_pipeline/ext/DINOv2-3D-Med"
+run_name: "dino_smoke"
+runs_dir: "/faststorage/project/aura_thymus/student_pipeline/runs/dino"
+img_size: [96, 96, 96]                  # global view size (2.0-3.3 mm effective, see dino_data.py)
+
+trainer#devices: 1
+trainer#strategy: auto
+trainer#sync_batchnorm: False
+trainer#precision: bf16-mixed           # L40S / H200 support bf16; no fp16 loss scaling needed
+trainer#logger:
+  _target_: pytorch_lightning.loggers.CSVLogger
+  save_dir: "@runs_dir"
+  name: "@run_name"
+  version: ""
+trainer#callbacks:
+  - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+    dirpath: '$@runs_dir + "/" + @run_name + "/ckpt"'
+    filename: "dino_{epoch:03d}"
+    save_last: True
+    save_top_k: -1                      # keep every saved epoch, for probing vs pretraining length
+    every_n_epochs: 10
+    save_on_train_epoch_end: True
+  - _target_: pytorch_lightning.callbacks.LearningRateMonitor
+    logging_interval: step
+  - _target_: dino_callbacks.Throughput
+    log_every_n_steps: "%trainer#log_every_n_steps"
+  - _target_: dino_callbacks.CSVGramMatrix
+    log_every_n_steps: "%trainer#log_every_n_steps"
+    feature_key: "student_cls_token"
+    max_samples: 128
+    saturation_offdiag_threshold: 0.995
+    saturation_offdiag_std_threshold: 0.01
+    saturation_sample_var_threshold: null
+    auto_fallback_to_backbone_on_saturation: true
+  - _target_: dino_callbacks.CSVTeacherEntropy
+    log_every_n_steps: "%trainer#log_every_n_steps"
+    max_samples: 128
+  - _target_: dino_callbacks.CSVEffectiveRank
+    log_every_n_steps: "%trainer#log_every_n_steps"
+    feature_key: "student_cls_token"
+    max_buffer_samples: 512
+
+data_module#num_workers: 12                # of the 16 CPUs in submit_s8 (augmentation is CPU-bound)
+data_module#batch_size: 4
+data_module#train_dataset:
+  _target_: dino_data.LungViews
+  global_size: "$@img_size[0]"
+  global_scale: [0.6, 1.0]
+  local_size: 24
+  local_scale: [0.15, 0.3]
+  num_local_views: 4
+  min_lung: 0.3

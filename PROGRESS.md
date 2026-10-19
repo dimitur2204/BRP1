@@ -373,3 +373,41 @@ files are copied with scp.
 **Later screening rounds (2026-10-19)**, cohort pids, CT / CT + seg.nii.gz: train yr1 10,410 / 8,687,
 yr2 10,015 / 8,613; val yr1 2,230 / 1,819, yr2 2,156 / 1,840; test yr1 2,253 / 1,877, yr2 2,187 / 1,894.
 Train + val pool: 13,893 → 34,852 scans with masks.
+
+## 2026-10-19: D1 data + S8 launcher (code, CPU-checked)
+
+**S7** (`src/s7_ssl_cache.py`): `s2_preprocess.preprocess(pid, rnd="yr0")` gained a round argument
+(default unchanged; 100002/100004 yr0 re-run = bit-identical to the S2 cache). Smoke: 4 yr1/yr2
+scans ok, 1.4–1.9 s/scan. `--list` on the cluster: 20,959 scans (train yr1 8,687, yr2 8,613; val
+1,819 / 1,840). Merge applies the S3 image QC and writes `data/ssl_scans.csv` (yr0 rows from
+cohort.csv), asserting no test pid.
+
+**D1 views** (`src/dino_data.py`). The repo's RandomResizedCrop3D crops side = scale × input side,
+then resizes; its default (96³ input, global scale 0.5–1.0) would upsample to 1.25–2.5 mm. We crop
+a random 128³ cube and use global 0.6–1.0 → 96³ (2.0–3.3 mm), local 0.15–0.30 → 24³ (2.0–4.0 mm).
+Lung voxels are ~20% of the 144×128×128 grid (the mediastinum is 0), so views < 30% lung are
+redrawn. QC on 64 yr0 scans: 195/384 views redrawn; final lung fraction median 0.42 (global) / 0.63
+(local), none < 0.3; 1.22 s CPU per scan (6 views) → 12 data workers ≈ 10 scans/s. The figure looks
+right (both lungs in global views, pleura/vessels in local views); Gaussian smoothing blurs some
+views noticeably (repo default, kept).
+
+**Repo quirks found by CPU runs of the full config** (tiny ViT, login node):
+- `run.py` applies overrides after `parse()`, so `%`-macro copies ignore them: `hidden_size=192`
+  left the backbone at 864-dim; `trainer#log_every_n_steps=4` left the callbacks at 50. S8 updates
+  before parsing (verified: 1.4 M-parameter backbone, callbacks fire at step 4).
+- `run.py` cannot resume → S8 resumes from `ckpt/last.ckpt` (verified) and refuses a relaunch whose
+  config files/overrides differ from `launch.json` (verified).
+- Warm-up is 10 epochs of the run (`configure_optimizers`), so `max_epochs` ≥ 11.
+- Collapse callbacks only log to W&B → `src/dino_callbacks.py` subclasses log to the CSVLogger
+  (verified: effective_rank, teacher_entropy(_normalized), gram offdiag mean/std, Gram PNGs).
+- 3D RoPE: `embed_dim / num_heads` must be divisible by 6 (864/12 = 72 ok; 384/6 not; 384/4 ok).
+- LearningRateMonitor writes one column per parameter group (layer decay) → wide metrics.csv.
+
+**D2 jobs to submit (user)**, both throwaway (2 h limit, yr0-only scans until the S7 merge; do not
+resume them after the merge, the scan list is not part of launch.json):
+    sbatch src/submit_s8_dino_pretrain.sh --run-name d2_m trainer#max_epochs=100
+    sbatch src/submit_s8_dino_pretrain.sh --run-name d2_s trainer#max_epochs=100 \
+        hidden_size=384 lightning_module#backbone#eva_depth=12 lightning_module#backbone#eva_numheads=4 \
+        data_module#batch_size=8
+Read: `grep throughput logs/s8_*.out` (sec_per_batch, data_wait_frac, gpu_peak_gb), `jobinfo`
+(GPU utilisation), `runs/dino/d2_*/metrics.csv` (losses, effective rank, entropy, Gram).

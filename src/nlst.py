@@ -67,3 +67,12 @@ def encode_hu(hu: np.ndarray, mask: np.ndarray) -> np.ndarray:
     out = (1.0 + np.rint(v * 254.0)).astype(np.uint8)
     out[~mask] = 0
     return out
+
+# ── self-supervised pretraining (s7+, branch ssl-dino) ───────────────────────
+# Pretraining scans: every QC-passing yr0/yr1/yr2 scan of train + val patients.
+# Test patients are never in it (asserted in s7 and dino_data).
+SSL_ROUNDS = ("yr1", "yr2")                          # later rounds added by s7 (yr0 = S2 cache)
+SSL_SPLITS = ("train", "val")
+SSL_CACHE_NPY = CACHE_DIR / "rounds_u8.npy"          # s7 output: yr1/yr2 volumes, same encoding
+SSL_CACHE_INDEX = CACHE_DIR / "rounds_index.csv"     # row -> scan + QC
+SSL_SCANS_CSV = DATA / "ssl_scans.csv"               # s7 output: the pretraining scan list

@@ -22,6 +22,10 @@ it is reused: no cohort, no split, no cache, no code.
 | S5 evaluate | `src/s5_evaluate.py --run {name}` | login node | `runs/{name}/eval/` |
 | S1b mask selection check | `src/s1b_mask_selection.py` | login node, minutes | `data/mask_selection_*.csv`, `data/mask_ipw.csv`, `figs/mask_selection.png` |
 | S6 saliency | `src/s6_saliency.py` via `submit_s6_saliency.sh` (1 GPU, `gpu-short`) | Slurm | `runs/{name}/saliency_val/` |
+| D0 SSL setup | `src/setup_dino_env.sh` | login node, ~15 min | `ext/DINOv2-3D-Med/`, `env/.venv-dino/` |
+| S7 SSL scans | `src/s7_ssl_cache.py --list`, `submit_s7_ssl_cache.sh` (40 CPU tasks), `--merge` | login node + Slurm | `data/cache/rounds_u8.npy`, `data/ssl_scans.csv` |
+| D1 views | `src/dino_data.py` (`--qc`) | used by S8; QC on login node | `figs/d1_views.png` |
+| S8 DINOv2 pretrain | `src/s8_dino_pretrain.py` via `submit_s8_dino_pretrain.sh` (1 GPU) | Slurm | `runs/dino/{name}/` |
 
 Shared code: `src/nlst.py` (paths and the whole input definition) and
 `src/model.py` (network, Cox loss, C-index, augmentation).
@@ -336,3 +340,42 @@ Smoke test without Slurm (CPU, ~3 min): run `s2_preprocess.py --pids ...
 - Residual blocks or pretrained weights, each tested against the current
   recipe one at a time.
 - Clinical adjustment (age, sex, smoking are in `cohort.csv`).
+
+## 8. Self-supervised pretraining (DINOv2, branch `ssl-dino`)
+
+Goal: learn lung features **without labels**, then predict time to cancer from
+them (linear Cox probe, D5) and compare with `cosine` through the unchanged S5.
+Plan and status: `PLAN.md` (D0–D6).
+
+| choice | value | why |
+|---|---|---|
+| method / code | DINOv2 (DINO + iBOT + KoLeo losses) from [AIM-Harvard/DINOv2-3D-Med](https://github.com/AIM-Harvard/DINOv2-3D-Med) at `77bde4d`, cloned into `ext/` | 3D port with collapse monitors. No released weights, so we pretrain ourselves. Not CT-FM: 128,037 of its ~148k pretraining scans are NLST, so it has seen our test scans (arXiv 2501.09001, Suppl. S5) |
+| environment | `env/.venv-dino` (Python 3.11, the repo's `uv.lock`, + pandas) | the repo needs ≥ 3.11; `env/.venv` (3.9) stays for S1–S6 |
+| pretraining scans | yr0 + yr1 + yr2 of **train + val** patients that pass the S3 image QC (`data/ssl_scans.csv`, ~34.8k) | no labels are used, so later screening rounds are fair game and give ~2.5× the scans. Test patients are excluded (asserted in S7 and `dino_data.py`), so test scans stay unseen. Consequence: DINO sees more images than the CNN did (without labels); a yr0-only DINO run separates the two effects if needed |
+| input | the S2 encoding and grid (2.5 mm, 144×128×128, uint8, 0 outside the lung) for every round | same view as `cosine`, so the comparison isolates self-supervised vs supervised learning. The ViT does not know the spacing; only consistency between pretraining and feature extraction matters |
+| views | random 128³ cube; 2 global views (side 0.6–1.0 × 128 → 96³, 2.0–3.3 mm) and 4 local views (0.15–0.30 × 128 → 24³, 2.0–4.0 mm); repo augmentations (affine ±10°, shear 0.1, histogram shift, Gaussian smoothing) | effective voxel size stays near the 2.5 mm used for extraction. Lung fills only ~20% of the grid, so a view with < 30% lung voxels is redrawn (≤ 10 tries) |
+| backbone | PRIMUS-M (EVA ViT, 864-dim, depth 16, patch 8³, RoPE + learned position embedding; 146 M parameters) | repo default; it accepts any input size, so the whole 144×128×128 lung (4,608 tokens) is one forward pass at extraction (D4): one embedding per patient, no crop pooling. A smaller ViT is compared in D2 |
+| training | repo recipe (`train.yaml`: base lr 0.004 × √(batch/1024), layer decay 0.9, wd 0.04→0.2, 10 warm-up epochs, teacher EMA 0.992→1); 1 GPU, bf16 | the schedules depend on `max_epochs` × steps per epoch, so a run must keep them fixed when it resumes (S8 checks) |
+| logging | Lightning CSVLogger, `runs/dino/{name}/metrics.csv`; the repo's collapse monitors (Gram matrix, teacher entropy, effective rank) re-routed from W&B by `src/dino_callbacks.py`; throughput (s/batch, share waiting for data, GPU memory) | no W&B account |
+
+Repo quirks found while wiring it up (2026-10-19):
+
+- `scripts/run.py` applies command-line overrides **after** `parse()`, so values
+  copied with `%` macros (`embed_dim: "%hidden_size"`, the callbacks'
+  `log_every_n_steps`) ignore overrides. S8 updates before parsing.
+- `scripts/run.py` cannot resume (`trainer.fit` without `ckpt_path`). S8 resumes
+  from `ckpt/last.ckpt` and refuses if the launch arguments changed.
+- Warm-up is fixed at 10 epochs of the run's own length, so a run needs
+  `max_epochs` ≥ 11.
+- The collapse callbacks only write to a WandbLogger (silently nothing otherwise).
+- 1 of 25 repo unit tests fails (a test expects an error wrapper `run.py` lacks;
+  cosmetic). `configs/predict.yaml` refers to modules that no longer exist.
+
+```bash
+bash src/setup_dino_env.sh                                        # D0, login node
+env/.venv/bin/python src/s7_ssl_cache.py --list                   # login node
+sbatch src/submit_s7_ssl_cache.sh                                 # 40 CPU tasks
+env/.venv/bin/python src/s7_ssl_cache.py --merge
+env/.venv-dino/bin/python src/dino_data.py --qc                   # figs/d1_views.png
+sbatch src/submit_s8_dino_pretrain.sh --run-name d2_m trainer#max_epochs=11   # D2
+```

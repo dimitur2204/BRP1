@@ -83,18 +83,19 @@ or clearly above `cosine`.
   `77bde4d` in `ext/`, `env/.venv-dino` (Python 3.11.13, torch 2.7.1+cu126, 4.9 GB). Repo tests 24/25
   (1 known upstream test/code mismatch, cosmetic). PRIMUS-M builds on CPU: 146.4 M parameters;
   96³ → 1,729 tokens, whole 144×128×128 lung → 4,609 tokens (incl. CLS).
-- **D1 data adapter** ⬜ `src/s7_dino_data.py`: a Dataset over `lungs_u8.npy` rows of
-  `cohort.csv` split ∈ {train, val} (13,893 scans), with a hard assert that no test pid is
-  present; returns float [0, 1] (0 = outside the lung, as in the cache). Our own config
-  `configs/dino/nlst_2p5mm.yaml` replaces the repo's NIfTI loading/spacing/HU transforms and keeps
-  `DINOv2Augmentation3D`. Check: the crop scales keep the effective voxel size near 2.5 mm (views
-  are resized to 96³ / 24³, which also changes scale), and crops land on lung. QC figure of
-  global/local views, as for S2.
-- **D2 smoke + throughput** ⬜ `src/submit_s8_dino_pretrain.sh` on `gpu-short` (1 L40S, < 2 h):
-  s/step, GPU memory, GPU utilisation (≥ 75% or GenomeDK cancels the job; CPU-side 3D
-  augmentation may bottleneck), collapse metrics (effective rank, teacher entropy, Gram matrix)
-  moving the right way. Then fix the model size (default PRIMUS-M: 864-dim, depth 16; a smaller
-  one may suit ~14k scans and one GPU), batch × accumulation, and the number of epochs.
+- **D1 data** ✅ code (2026-10-19). `src/s7_ssl_cache.py` + `submit_s7_ssl_cache.sh`: yr1/yr2 of
+  train + val pids through the unchanged S2 `preprocess` (yr0 output re-checked bit-identical),
+  same S3 image QC → `data/ssl_scans.csv`. `--list` ✅ 20,959 scans to do.
+  ⬜ **user: `sbatch src/submit_s7_ssl_cache.sh`, then `s7_ssl_cache.py --merge`.**
+  `src/dino_data.py` (`LungViews`): random 128³ cube → 2 global 96³ (2.0–3.3 mm) + 4 local 24³
+  (2.0–4.0 mm) views with the repo augmentations; views < 30% lung are redrawn. QC ✅
+  `figs/d1_views.png` (64 yr0 scans): view lung fraction median 0.42 global / 0.63 local, ~50% of
+  views needed a redraw, 1.2 s CPU per scan. `configs/dino/nlst_2p5mm.yaml`, `src/dino_callbacks.py`.
+- **D2 smoke + throughput** ⬜ code ✅: `src/s8_dino_pretrain.py` + `submit_s8_dino_pretrain.sh`
+  (gpu-short, 16 CPUs, 12 data workers). CPU check ✅ (tiny model): losses, collapse monitors,
+  throughput, checkpoints, resume, launch-mismatch guard. ⬜ **user: two D2 jobs (PROGRESS
+  2026-10-19)**: PRIMUS-M vs a small ViT; read s/batch, data_wait_frac, GPU memory, collapse.
+  Then fix model size, batch × accumulation, epochs. 3D RoPE needs embed_dim/heads divisible by 6.
 - **D3 pretrain** ⬜ the same script on `gpu` (12 h jobs), chained with
   `--dependency=afterany` and resumed from `last.ckpt`. Keep checkpoints at intervals so feature
   quality can be probed against pretraining length. Stop early if D5 on an intermediate checkpoint
