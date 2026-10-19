@@ -86,16 +86,20 @@ or clearly above `cosine`.
 - **D1 data** ✅ code (2026-10-19). `src/s7_ssl_cache.py` + `submit_s7_ssl_cache.sh`: yr1/yr2 of
   train + val pids through the unchanged S2 `preprocess` (yr0 output re-checked bit-identical),
   same S3 image QC → `data/ssl_scans.csv`. `--list` ✅ 20,959 scans to do.
-  ⬜ **user: `sbatch src/submit_s7_ssl_cache.sh`, then `s7_ssl_cache.py --merge`.**
+  ✅ run (job 5098861, 8–12 min/task) + merge: 20,938/20,959 ok (21 empty lung masks); QC drops
+  98 short z, 56 small, 15 clipped → `data/ssl_scans.csv` **34,719 scans** of 13,893 pids
+  (train 11,442 / 8,634 / 8,563, val 2,451 / 1,799 / 1,830 for yr0 / yr1 / yr2).
   `src/dino_data.py` (`LungViews`): random 128³ cube → 2 global 96³ (2.0–3.3 mm) + 4 local 24³
   (2.0–4.0 mm) views with the repo augmentations; views < 30% lung are redrawn. QC ✅
   `figs/d1_views.png` (64 yr0 scans): view lung fraction median 0.42 global / 0.63 local, ~50% of
   views needed a redraw, 1.2 s CPU per scan. `configs/dino/nlst_2p5mm.yaml`, `src/dino_callbacks.py`.
-- **D2 smoke + throughput** ⬜ code ✅: `src/s8_dino_pretrain.py` + `submit_s8_dino_pretrain.sh`
-  (gpu-short, 16 CPUs, 12 data workers). CPU check ✅ (tiny model): losses, collapse monitors,
-  throughput, checkpoints, resume, launch-mismatch guard. ⬜ **user: two D2 jobs (PROGRESS
-  2026-10-19)**: PRIMUS-M vs a small ViT; read s/batch, data_wait_frac, GPU memory, collapse.
-  Then fix model size, batch × accumulation, epochs. 3D RoPE needs embed_dim/heads divisible by 6.
+- **D2 smoke + throughput** ✅ run (jobs 5098862/3, gpu-short L40S, 2 h, epoch 40/100, yr0 only):
+  `d2_m` PRIMUS-M 146 M, batch 4: 0.57 s/batch (~25k scans/h), 3% data wait, 33.7 GB.
+  `d2_s` 384-dim/12 layers 22 M, batch 8: 0.63 s/batch (~45k scans/h), 25% data wait, 36.8 GB.
+  **Collapse warning** in both: DINO-head outputs nearly identical across scans (Gram off-diag
+  0.97–0.99), effective rank 1.5–3.4 (of max 8/16 samples), teacher entropy falling to 0.15–0.2.
+  Backbone CLS less so (off-diag 0.1–0.5). Monitors use only one batch (8–16 samples): noisy.
+  ⬜ Decide with D4/D5 on the d2 checkpoints vs a random-init backbone (PROGRESS 2026-10-19).
 - **D3 pretrain** ⬜ the same script on `gpu` (12 h jobs), chained with
   `--dependency=afterany` and resumed from `last.ckpt`. Keep checkpoints at intervals so feature
   quality can be probed against pretraining length. Stop early if D5 on an intermediate checkpoint

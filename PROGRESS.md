@@ -411,3 +411,38 @@ resume them after the merge, the scan list is not part of launch.json):
         data_module#batch_size=8
 Read: `grep throughput logs/s8_*.out` (sec_per_batch, data_wait_frac, gpu_peak_gb), `jobinfo`
 (GPU utilisation), `runs/dino/d2_*/metrics.csv` (losses, effective rank, entropy, Gram).
+
+## 2026-10-19: S7 run + D2 results
+
+**S7** (job 5098861, 40 × 8–12 min) + merge: 20,938/20,959 yr1/yr2 scans ok (21 `empty lung
+mask`). Image QC: 98 lung z < 200 mm, 56 lung < 1,500 mL, 15 clipped > 2%. `data/ssl_scans.csv`:
+34,719 scans of 13,893 pids (train yr0/yr1/yr2 11,442 / 8,634 / 8,563; val 2,451 / 1,799 / 1,830).
+`rounds_u8.npy` 49.4 GB apparent. Median 0.97 s/scan.
+
+**D2** (jobs 5098862 `d2_m`, 5098863 `d2_s`; gpu-short L40S 46 GB; both started before the merge,
+so yr0 only; both hit the 2 h limit at epoch 40 of 100 = 1,667 optimiser steps, as planned;
+checkpoints at epochs 9/19/29/39 kept in `runs/dino/d2_*/ckpt/`).
+
+| | d2_m PRIMUS-M | d2_s 384-dim, depth 12, 4 heads |
+|---|---|---|
+| parameters | 146.4 M | 22.4 M |
+| batch × accumulation | 4 × 6 | 8 × 6 |
+| s / batch | 0.57 | 0.63 |
+| scans / h | ~25k | ~45k |
+| data wait | 3% (GPU-bound) | 25% (CPU-bound) |
+| GPU peak | 33.7 GB | 36.8 GB |
+
+Collapse monitors (every 150 steps; each computed on ONE batch: 8 (m) / 16 (s) global CLS tokens):
+- DINO-head output (`student_cls_token`) Gram off-diagonal 0.97–0.99 whenever measured on it:
+  nearly the same output for every scan. The callback then falls back to the backbone CLS (off-diag
+  0.1–0.5, std 0.2–0.4), so the logged Gram numbers alternate between the two.
+- Effective rank (on the head output): d2_m 5.7 → 1.5–2.6 (max 8); d2_s 12.1 → 1.4–3.4 (max 16).
+- Teacher entropy (normalised) 0.87 → 0.2 (m) / 0.15 (s) by step 1,500–1,650.
+- Losses fall (total 21.6 → ~7–10) but noisily; with a peaked teacher a falling DINO loss is
+  not evidence of learning.
+Reading: signs of (partial) collapse of the DINO head; the backbone CLS is not constant. Plausible
+cause: lungs at 2.5 mm, centred and masked, look much alike across patients, so cross-view
+matching is easy to satisfy with little information. The authors' `configs/experiments/` collapse
+recipes (lower lr, faster centring, smaller head, tighter clipping) exist for this. The monitors
+are too noisy (8–16 samples) to settle it. Decisive test: features of the d2 checkpoints vs a
+random-init backbone in a Cox probe (D4 + D5), before spending days on D3.
