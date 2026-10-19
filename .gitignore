@@ -3,6 +3,10 @@
 #     matplotlib pandas scipy torch scikit-learn lifelines scikit-survival
 env/
 
+# DINOv2-3D-Med (AIM-Harvard, Apache-2.0) pinned clone + its venv (env/.venv-dino) -- regenerate with:
+#   bash src/setup_dino_env.sh
+ext/
+
 # Public NLST IDC-780 clinical package (TCIA, CC BY 4.0): outcome + age/sex/smoking.
 # Regeneration command: docs/pipeline.md, section 6.
 data/external/

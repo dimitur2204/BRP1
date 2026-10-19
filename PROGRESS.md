@@ -358,3 +358,18 @@ mm nodules are ~2 voxels, the same view as `cosine` (which S6 showed learns lung
 **Cluster checks (2026-10-18).** No Python ≥ 3.11 or `uv` on GenomeDK (python3 3.9.25).
 `{pid}_yr1/yr2` CT + TotalSegmentator folders exist (pid 100002). `gpu-h200`: 2 nodes × 4 H200,
 AllowAccounts=ALL, max 7 days. No W&B account → CSV logging.
+
+**D0 setup ✅ (2026-10-19).** `src/setup_dino_env.sh`: system python3 has no pip → uv 0.8.22
+release binary (sha256-checked) into `~/.local/bin`; repo cloned at `77bde4d` into `ext/`
+(gitignored); `uv sync --frozen` → `env/.venv-dino` (Python 3.11.13, torch 2.7.1+cu126, 4.9 GB;
+uv Python 41 MB under `env/uv-python`). Repo unit tests: 24/25 pass; `test_project_import_failure_is_actionable`
+fails because `scripts/run.py` does not wrap the import error the test expects (upstream test ahead
+of code; cosmetic). CPU check: PRIMUS-M (864-dim, depth 16, patch 8³) = 146.4 M parameters; a 96³
+crop → 1,729 tokens, the whole 144×128×128 S2 lung → 4,609 tokens, so the whole-lung embedding
+works as planned. 146 M parameters for 14–35k scans is large → compare a smaller ViT in D2.
+Note: the cluster tree is a shared group folder (owner dimitarnizamov), not a git checkout;
+files are copied with scp.
+
+**Later screening rounds (2026-10-19)**, cohort pids, CT / CT + seg.nii.gz: train yr1 10,410 / 8,687,
+yr2 10,015 / 8,613; val yr1 2,230 / 1,819, yr2 2,156 / 1,840; test yr1 2,253 / 1,877, yr2 2,187 / 1,894.
+Train + val pool: 13,893 → 34,852 scans with masks.

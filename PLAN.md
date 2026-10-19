@@ -79,11 +79,10 @@ or clearly above `cosine`.
 
 ## Stages (proposed; scripts follow the `s{N}_*.py` / `submit_s{N}_*.sh` style)
 
-- **D0 setup** ⬜ Clone the repo pinned at `77bde4d` into `ext/DINOv2-3D-Med` (gitignored;
-  regeneration command in `docs/pipeline.md`). It needs Python ≥ 3.11 (torch 2.7.1, MONAI 1.4,
-  Lightning 2.5, lightly, dynamic-network-architectures), so a second venv `env/.venv-dino` built
-  with `uv`; `env/.venv` (3.9) stays for S1–S6. Run the repo's own tests on CPU.
-  W&B logger → offline mode (or CSV) unless compute nodes have internet.
+- **D0 setup** ✅ (2026-10-19) `bash src/setup_dino_env.sh` (login node): uv 0.8.22, repo at
+  `77bde4d` in `ext/`, `env/.venv-dino` (Python 3.11.13, torch 2.7.1+cu126, 4.9 GB). Repo tests 24/25
+  (1 known upstream test/code mismatch, cosmetic). PRIMUS-M builds on CPU: 146.4 M parameters;
+  96³ → 1,729 tokens, whole 144×128×128 lung → 4,609 tokens (incl. CLS).
 - **D1 data adapter** ⬜ `src/s7_dino_data.py`: a Dataset over `lungs_u8.npy` rows of
   `cohort.csv` split ∈ {train, val} (13,893 scans), with a hard assert that no test pid is
   present; returns float [0, 1] (0 = outside the lung, as in the cache). Our own config
@@ -113,11 +112,12 @@ or clearly above `cosine`.
 ## Open items (D0)
 
 Checked on GenomeDK 2026-10-18:
-- No Python ≥ 3.11 and no `uv` (system python3 is 3.9.25). D0 installs `uv` to `~/.local/bin`;
-  `uv` downloads its own Python for `env/.venv-dino`.
-- Later screening rounds exist: `ct_1x1x2mm/{pid}_yr1/yr2.nii.gz` and `totalseg_fullres/{pid}_yr1/yr2`
-  (checked for pid 100002 only). ⬜ Count them for cohort pids. If most exist, the pretraining
-  pool could roughly triple (non-test patients only; needs S2 on those scans, its own cache).
+- No Python ≥ 3.11, no `uv`, no pip for the system python3 (3.9.25) → D0 installs the uv release
+  binary; uv downloads its own Python.
+- Later screening rounds, cohort pids with CT + `seg.nii.gz` (2026-10-19): train yr1 8,687 / yr2
+  8,613, val 1,819 / 1,840 (test 1,877 / 1,894, never used). Pretraining pool train + val: 13,893
+  (yr0 only) → **34,852** scans with yr1/yr2. ⬜ **user decision:** yr0 only first, or add yr1/yr2
+  (needs S2 on ~21k more scans into a separate cache, ~0.5–1 day of CPU array jobs).
 - `gpu-h200` (2 nodes × 4 H200, max 7 days) has AllowAccounts=ALL, so it should accept
   `aura_thymus`; confirm with the D2 job. `gpu` / `gpu-l40s` also allow 7 days (S4 used 12 h by choice).
 - No W&B account (user) → `WANDB_MODE=disabled`, Lightning `CSVLogger`; check the repo's collapse
