@@ -117,7 +117,7 @@ Checked on GenomeDK 2026-10-18:
 - Later screening rounds, cohort pids with CT + `seg.nii.gz` (2026-10-19): train yr1 8,687 / yr2
   8,613, val 1,819 / 1,840 (test 1,877 / 1,894, never used). Pretraining pool train + val: 13,893
   (yr0 only) → **34,852** scans with yr1/yr2. ⬜ **user decision:** yr0 only first, or add yr1/yr2
-  (needs S2 on ~21k more scans into a separate cache, ~0.5–1 day of CPU array jobs).
+  (needs S2 on ~21k more scans into a separate cache; S2 ran at ~1 s/scan, so a 40-task array is well under an hour plus queueing, and ~50 GB of disk).
 - `gpu-h200` (2 nodes × 4 H200, max 7 days) has AllowAccounts=ALL, so it should accept
   `aura_thymus`; confirm with the D2 job. `gpu` / `gpu-l40s` also allow 7 days (S4 used 12 h by choice).
 - No W&B account (user) → `WANDB_MODE=disabled`, Lightning `CSVLogger`; check the repo's collapse
