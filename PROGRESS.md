@@ -446,3 +446,24 @@ matching is easy to satisfy with little information. The authors' `configs/exper
 recipes (lower lr, faster centring, smaller head, tighter clipping) exist for this. The monitors
 are too noisy (8–16 samples) to settle it. Decisive test: features of the d2 checkpoints vs a
 random-init backbone in a Cox probe (D4 + D5), before spending days on D3.
+
+## 2026-10-19: D4 features + D5 probe (code)
+
+**S9** (`src/s9_dino_features.py`): checkpoints store the teacher as `model.teacher_backbone.*`
+(294 tensors); the backbone is rebuilt from the run's `launch.json` and loaded strict. Whole yr0
+volume (144×128×128 → 18×16×16 tokens), bf16, [CLS, mean patch] → 2 × embed_dim per patient, cohort
+order, all splits (no labels). One pass over the data serves all requested checkpoints. CPU smoke
+(d2_s, 8 patients): random-init features nearly identical across patients (mean pairwise
+correlation 0.989), epoch-39 features much less so (0.675) -- the backbone is not constant.
+
+**S10** (`src/s10_dino_probe.py`): elastic-net Cox (sksurv Coxnet, l1_ratio 0.5, 50 alphas down to
+1% of alpha_max) on train, penalty by val C, eta for all patients → `runs/probe_*/pred.csv`.
+Synthetic check (val): plain Cox on age + lung_ml 0.611 (age alone 0.585, lung_ml 0.593); the
+same 2 columns + 0.5 SD noise among 126 noise columns → probe 0.581 (2 non-zero); ridge Cox on all
+128 columns 0.555; 128 noise columns → 0.511. The noise columns cost ~0.03 C at 724 train events,
+so absolute probe C is conservative; comparisons (checkpoint vs random) are like for like.
+
+**D4 jobs to submit (user)** -- d2_m split in two (146 M params, one forward per checkpoint):
+    sbatch src/submit_s9_dino_features.sh --run d2_s --ckpts random "dino_epoch=009" "dino_epoch=019" "dino_epoch=029" "dino_epoch=039"
+    sbatch src/submit_s9_dino_features.sh --run d2_m --ckpts random "dino_epoch=009" "dino_epoch=019"
+    sbatch --begin=now+10minutes src/submit_s9_dino_features.sh --run d2_m --ckpts "dino_epoch=029" "dino_epoch=039"

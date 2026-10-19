@@ -104,13 +104,15 @@ or clearly above `cosine`.
   `--dependency=afterany` and resumed from `last.ckpt`. Keep checkpoints at intervals so feature
   quality can be probed against pretraining length. Stop early if D5 on an intermediate checkpoint
   is no better than random-init features.
-- **D4 features** ⬜ `src/s9_dino_features.py`: teacher backbone, full 144×128×128 volume at
-  2.5 mm, for **all** cohort patients → CLS token + mean patch token per patient, saved in
-  cohort-row order (`data/features/{run}/{ckpt}.npy`). Also a random-init backbone (control).
-- **D5 linear probe** ⬜ `src/s10_dino_probe.py`: penalised Cox on the features (fit on train,
-  penalty chosen by val C), writes `runs/{name}/pred.csv` in the S4 format, so
-  `s5_evaluate.py` runs unchanged (incl. `--added-only`). Compare on the same split: random-init
-  features, DINO checkpoints, `cosine`, clinical. Test is read only by S5.
+- **D4 features** code ✅ (2026-10-19) `src/s9_dino_features.py` + `submit_s9_dino_features.sh`:
+  teacher backbone rebuilt from the run's launch.json, whole 144×128×128 yr0 volume, [CLS, mean patch
+  token] for all 16,345 cohort patients → `data/features/{run}/{ckpt}.npy`; `random` = same backbone,
+  random weights (control). CPU smoke ✅. ⬜ **user: 3 jobs on the d2 checkpoints (PROGRESS).**
+- **D5 linear probe** code ✅ `src/s10_dino_probe.py`: z-score (train) → elastic-net Cox (l1 0.5,
+  50 penalties) on train → penalty by val C → `runs/probe_*/pred.csv` (S4 format, S5 unchanged);
+  `--summary` = val C of every probe + `cosine` val C 0.688. No test metric. Synthetic check ✅
+  (age + lung volume + noise: val 0.581 vs 0.61 for a Cox on the 2 true columns; pure noise 0.511):
+  the probe is conservative; checkpoints and the random control pay the same price.
 - **D6 fine-tune (optional)** ⬜ the backbone + a linear Cox head trained with `cox_loss`
   (S4-style, low lr, layer decay), vs the same ViT trained from scratch.
 
