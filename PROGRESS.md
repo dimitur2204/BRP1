@@ -544,3 +544,16 @@ Collapse monitors (each on one batch of 16 global CLS tokens; losses = median ov
   14.7/16, last backbone Gram (fallback) 0.02 ± 0.07: the patch-level objective is learning and the
   backbone CLS tokens differ between scans.
 Checkpoints so far: default epochs 9/19/29, stable 9/19/29/39.
+
+**`default` cancelled by the user (job 5203077, ~epoch 32). S9 on `stable` (job 5222074):**
+checkpoints 9/19/29/39 + random. S10 val C: random 0.636; epochs 9 / 19 / 29 / 39 → 0.658 / 0.648 /
+0.650 / 0.658 (84–151 non-zero; train C 0.67–0.70). Flat from epoch 9: no gain from further
+training. Paired bootstrap (val, 1,000×): ep39 − random +0.022 [−0.011, +0.058] (same for ep9);
+ep39 − trial_2h/small ep39 −0.000 [−0.034, +0.034]; ep39 − cosine −0.030 [−0.059, −0.001].
+Spearman with lung_ml / lung_mean_hu / age / cosine η: random +0.52 / −0.49 / +0.10 / +0.54;
+stable ep39 +0.25 / −0.19 / +0.16 / +0.74; trial small ep39 +0.48 / −0.38 / +0.07 / +0.54.
+Reading: the stable features (driven by iBOT, the DINO term was inert) depend less on lung size
+and agree more with the supervised CNN's risk score (ρ 0.74), but their linear probe is no
+better than the 2 h trial's, not clearly above random weights, and significantly below cosine.
+Longer training does not help (flat from epoch 9). The authors' recipe on this input does not
+give a better linear probe.
