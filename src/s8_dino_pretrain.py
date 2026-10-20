@@ -20,7 +20,7 @@ Outputs, runs/dino/{run}/:
   ckpt/last.ckpt      resume point; ckpt/dino_epoch=NNN.ckpt every 10 epochs
 
 Usage:
-    sbatch src/submit_s8_dino_pretrain.sh --run-name d2_m trainer#max_epochs=10
+    sbatch src/submit_s8_dino_pretrain.sh --run-name trial_2h/big trainer#max_epochs=100
     env/.venv-dino/bin/python src/s8_dino_pretrain.py --run-name x --print-config
 """
 from __future__ import annotations

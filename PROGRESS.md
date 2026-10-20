@@ -500,3 +500,25 @@ Proposed next (not started): small model, full 100 epochs on all 34,719 scans, d
 the repo's anti-collapse recipe (exp07: base_lr 0.002, center_momentum 0.9, gradient_clip_val 1.0,
 projection_dim 16384), ~5 h each; same S9/S10 against random. If neither beats random, change the
 input (finer-scale crops) rather than the recipe.
+
+## 2026-10-20: run folders regrouped; small-model runs at the authors' length prepared
+
+**Regrouped (user request; only plamenmichev's folders moved; `runs/baseline`, `runs/cosine` are
+dimitarnizamov's and are referenced everywhere, so they stay):**
+`runs/{e40_ema_s*, e40_epb4_s*, epb4_s*}` → `runs/cosine_improved_trial/`;
+`runs/dino/d2_s`, `d2_m` → `runs/dino/trial_2h/small`, `big`; `data/features/d2_*` →
+`data/features/trial_2h/{small,big}`; `runs/probe_d2_{s,m}_{ckpt}_both` →
+`runs/dino_probe/trial_2h/{small,big}/{ckpt}_both`. The `run` field in the moved probe and feature
+JSONs was rewritten (old name kept as `run_old`). `s10 --summary` reproduces the 2026-10-20 table.
+S10's default output is now `runs/dino_probe/{run}/{ckpt}_{use}`. The d2 runs' launch.json still
+says run_name d2_*, so they cannot be resumed (not needed).
+
+**Order (user, 2026-10-20):** the authors' recipe first (small model), then the big model with the
+winning recipe. `trial_2h/big` already was the authors' default recipe, but with 24 instead of 120
+scans per optimiser step (1 vs 4 GPUs) and 40 short epochs (40k samples) instead of 750k. The two
+runs below match the authors' batch and length on one GPU; `stable` adds their exp07 anti-collapse
+settings. Dry-run (`--print-config`) confirms every override: max_epochs 150,
+limit_train_batches 625, accumulation 15, batch 8, 20 workers, 384-dim / 12 layers / 4 heads,
+default base_lr 0.004 / centre momentum 0.99 / clip 3.0 / projection 65,536 vs stable 0.002 / 0.9 /
+1.0 / 16,384. lr = base_lr × √(120/1024). GPU nodes have 128 CPUs (gpu: 7 L40S, gpu-h200: 2 × 4
+H200), so -c 24 / 20 workers per job (d2_s waited 25% on 12 workers). Commands: docs/pipeline.md §8.

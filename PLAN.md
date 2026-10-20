@@ -58,7 +58,8 @@ no hyperparameter grid.
 # Next: self-supervised pretraining (DINOv2-3D-Med), branch `ssl-dino`
 
 Branch `ssl-dino` (from `cnn3d-lungs-cox` cd6940c), 2026-10-18. Background and findings in
-PROGRESS (2026-10-18).
+PROGRESS (2026-10-18). Run folders regrouped 2026-10-20 (`docs/pipeline.md`, Pipeline):
+`d2_s` / `d2_m` are now `trial_2h/small` / `trial_2h/big`.
 
 ## Goal
 
@@ -117,7 +118,12 @@ or clearly above `cosine`.
   d2_m random 0.649 → 0.636/0.616/0.633/0.645. Refs: clinical-5 0.636, cosine 0.688. ΔC vs random
   d2_s +0.022 [−0.008, +0.056], d2_m −0.004 [−0.037, +0.028]; d2_s ep 39 vs cosine −0.030
   [−0.067, +0.004]. Random features ≈ lung size/density (ρ ±0.5). Not yet better than random.
-  ⬜ **user decision:** full-length small-model runs (default vs anti-collapse recipe) before D3.
+  ✅ decided (user, 2026-10-20): first the authors' recipe at their run length on the small model,
+  default vs anti-collapse, then the winner on the big model.
+- **D2b small model, authors' length** ⬜ **user: 2 jobs** (`docs/pipeline.md` §8):
+  `runs/dino/small_150ep/{default,stable}`, 34,719 scans, batch 8 × 15 = 120 per step (authors'),
+  150 epochs × 5,000 scans = 750k samples, ~15 h each on an L40S. Config dry-run ✅. Then S9
+  (random + every 10th... epochs 29/59/89/119/149) and S10 as for the 2 h trial.
 - **D6 fine-tune (optional)** ⬜ the backbone + a linear Cox head trained with `cox_loss`
   (S4-style, low lr, layer decay), vs the same ViT trained from scratch.
 

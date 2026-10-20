@@ -11,7 +11,7 @@
 
 # S8 -- DINOv2 pretraining. All arguments are passed to s8_dino_pretrain.py.
 # D2 smoke/throughput (gpu-short, < 2 h; the defaults above):
-#   sbatch src/submit_s8_dino_pretrain.sh --run-name d2_m trainer#max_epochs=10
+#   sbatch src/submit_s8_dino_pretrain.sh --run-name trial_2h/big trainer#max_epochs=100
 # D3 full run: longer partition/time on the command line, before the script name, e.g.
 #   sbatch -p gpu-h200 -t 3-00:00:00 src/submit_s8_dino_pretrain.sh --run-name d3_... ...
 # Re-submitting the same command resumes from runs/dino/{run}/ckpt/last.ckpt.

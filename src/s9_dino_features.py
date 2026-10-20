@@ -22,8 +22,8 @@ Outputs, data/features/{run}/:
   pids.csv      pid per row (check against cohort.csv)
 
 Usage:
-    sbatch src/submit_s9_dino_features.sh --run d2_m --ckpts random "dino_epoch=009" ...
-    env/.venv-dino/bin/python src/s9_dino_features.py --run d2_s --ckpts random --limit 8 \\
+    sbatch src/submit_s9_dino_features.sh --run trial_2h/big --ckpts random "dino_epoch=009" ...
+    env/.venv-dino/bin/python src/s9_dino_features.py --run trial_2h/small --ckpts random --limit 8 \\
         --device cpu --out-dir <scratch>      # smoke test
 """
 from __future__ import annotations

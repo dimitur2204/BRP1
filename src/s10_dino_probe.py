@@ -15,15 +15,15 @@ backbone is trained. Same cohort, split, time and event as S4 (data/cohort.csv).
              so s5_evaluate.py runs unchanged. This script never computes a test
              metric; test rows are only read by s5_evaluate.py.
 
-Outputs, runs/{name}/ (name default: probe_{run}_{ckpt}_{use}):
+Outputs, runs/{name}/ (name default: dino_probe/{run}/{ckpt}_{use}):
   config.json   arguments, chosen penalty, non-zero coefficients, train / val C
   path.csv      per penalty: alpha, non-zero coefficients, train C, val C
   pred.csv      pid, split, time, event, eta
 
 Usage (login node, env/.venv, ~1-5 min per probe):
-    env/.venv/bin/python src/s10_dino_probe.py --run d2_m --ckpt "dino_epoch=039"
-    env/.venv/bin/python src/s10_dino_probe.py --summary      # val C of every probe_* run
-    env/.venv/bin/python src/s5_evaluate.py --run probe_d2_m_dino_epoch=039_both  # chosen one only
+    env/.venv/bin/python src/s10_dino_probe.py --run trial_2h/small --ckpt "dino_epoch=039"
+    env/.venv/bin/python src/s10_dino_probe.py --summary      # val C of every probe
+    env/.venv/bin/python src/s5_evaluate.py --run "dino_probe/trial_2h/small/dino_epoch=039_both"  # chosen one only
 """
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ def load_features(run: str, ckpt: str, use: str, cohort: pd.DataFrame) -> np.nda
 
 
 def probe(a) -> None:
-    name = a.name or f"probe_{a.run}_{a.ckpt}_{a.use}"
+    name = a.name or f"dino_probe/{a.run}/{a.ckpt}_{a.use}"
     out = Path(RUNS_DIR) / name
     if (out / "pred.csv").exists() and not a.overwrite:
         raise SystemExit(f"{out} exists (new --name or --overwrite)")
@@ -100,8 +100,9 @@ def probe(a) -> None:
 
 
 def summary() -> None:
-    rows = [json.loads(p.read_text()) | {"name": p.parent.name}
-            for p in sorted(Path(RUNS_DIR).glob("probe_*/config.json"))]
+    root = Path(RUNS_DIR) / "dino_probe"
+    rows = [json.loads(p.read_text()) | {"name": str(p.parent.relative_to(root))}
+            for p in sorted(root.glob("**/config.json"))]
     ref = Path(RUNS_DIR) / "cosine" / "pred.csv"
     if ref.exists():  # the supervised CNN, val C from its own predictions
         p = pd.read_csv(ref)
@@ -116,7 +117,7 @@ def summary() -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--run", help="pretraining run (data/features/{run}/)")
+    ap.add_argument("--run", help="pretraining run, e.g. trial_2h/small (data/features/{run}/)")
     ap.add_argument("--ckpt", help='feature file name without .npy, e.g. "dino_epoch=039" or random')
     ap.add_argument("--use", choices=["cls", "mean", "both"], default="both")
     ap.add_argument("--l1-ratio", type=float, default=0.5)

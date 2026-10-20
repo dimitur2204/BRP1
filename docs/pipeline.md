@@ -27,7 +27,18 @@ it is reused: no cohort, no split, no cache, no code.
 | D1 views | `src/dino_data.py` (`--qc`) | used by S8; QC on login node | `figs/d1_views.png` |
 | S8 DINOv2 pretrain | `src/s8_dino_pretrain.py` via `submit_s8_dino_pretrain.sh` (1 GPU) | Slurm | `runs/dino/{name}/` |
 | S9 DINOv2 features | `src/s9_dino_features.py` via `submit_s9_dino_features.sh` (1 GPU) | Slurm | `data/features/{run}/{ckpt}.npy` |
-| S10 Cox probe | `src/s10_dino_probe.py` (`--summary`) | login node, minutes | `runs/probe_*/` (S4 format → S5) |
+| S10 Cox probe | `src/s10_dino_probe.py` (`--summary`) | login node, minutes | `runs/dino_probe/{run}/{ckpt}_{use}/` (S4 format → S5) |
+
+Run folders (`runs/`, regrouped 2026-10-20; every script takes the path below `runs/` as the
+run name, e.g. `s5_evaluate.py --run cosine_improved_trial/epb4_s0`):
+
+| folder | contents |
+|---|---|
+| `runs/baseline`, `runs/cosine` | the first two CNN runs (S4/S5/S6); `cosine` is the reference |
+| `runs/cosine_improved_trial/` | the CNN recipe trials of 2026-10-17 (`e40_ema_s*`, `e40_epb4_s*`, `epb4_s*`) |
+| `runs/dino/trial_2h/{small,big}` | DINOv2 2 h trial pretraining (D2; were `d2_s` / `d2_m`) |
+| `runs/dino/small_150ep/{default,stable}` | DINOv2 small model, authors' run length, default vs anti-collapse recipe |
+| `runs/dino_probe/{dino run}/{ckpt}_{use}` | Cox probes (S10) on the features in `data/features/{dino run}/` |
 
 Shared code: `src/nlst.py` (paths and the whole input definition) and
 `src/model.py` (network, Cox loss, C-index, augmentation).
@@ -296,9 +307,9 @@ the `gpu-short` partition (8 L40S, 2 h max), which usually has free GPUs, unlike
 
 ```bash
 for s in 0 1 2; do
-  sbatch -p gpu-short -t 01:30:00 src/submit_s4_train.sh --run-name e40_ema_s$s --seed $s \
+  sbatch -p gpu-short -t 01:30:00 src/submit_s4_train.sh --run-name cosine_improved_trial/e40_ema_s$s --seed $s \
       --epochs 40 --ema 0.999 --select last
-  sbatch -p gpu-short -t 01:30:00 src/submit_s4_train.sh --run-name e40_epb4_s$s --seed $s \
+  sbatch -p gpu-short -t 01:30:00 src/submit_s4_train.sh --run-name cosine_improved_trial/e40_epb4_s$s --seed $s \
       --epochs 40 --ema 0.999 --select last --events-per-batch 4
 done
 ```
@@ -376,11 +387,30 @@ Repo quirks found while wiring it up (2026-10-19):
 - 1 of 25 repo unit tests fails (a test expects an error wrapper `run.py` lacks;
   cosmetic). `configs/predict.yaml` refers to modules that no longer exist.
 
+Small-model comparison at the authors' run length (2026-10-20). The authors trained on 4 GPUs
+with 5 scans × 6 accumulation each = 120 scans per optimiser step and 150 epochs of 250 steps per
+GPU (750k samples). On one GPU: batch 8 × accumulation 15 = 120, epoch = 625 batches = 5,000
+scans, 150 epochs. `stable` adds the authors' anti-collapse experiment (exp07: base lr 0.002,
+centre momentum 0.9, gradient clip 1.0, projection 16,384). The winner's recipe then goes to the
+big model.
+
+```bash
+COMMON="trainer#max_epochs=150 trainer#limit_train_batches=625 trainer#accumulate_grad_batches=15 \
+  hidden_size=384 lightning_module#backbone#eva_depth=12 lightning_module#backbone#eva_numheads=4 \
+  data_module#batch_size=8 data_module#num_workers=20"
+sbatch -p gpu,gpu-h200 -t 1-00:00:00 -c 24 src/submit_s8_dino_pretrain.sh \
+  --run-name small_150ep/default $COMMON
+sbatch -p gpu,gpu-h200 -t 1-00:00:00 -c 24 src/submit_s8_dino_pretrain.sh \
+  --run-name small_150ep/stable $COMMON lightning_module#base_lr=0.002 \
+  lightning_module#center_momentum=0.9 lightning_module#gradient_clip_val=1.0 \
+  lightning_module#projection_dim=16384
+```
+
 ```bash
 bash src/setup_dino_env.sh                                        # D0, login node
 env/.venv/bin/python src/s7_ssl_cache.py --list                   # login node
 sbatch src/submit_s7_ssl_cache.sh                                 # 40 CPU tasks
 env/.venv/bin/python src/s7_ssl_cache.py --merge
 env/.venv-dino/bin/python src/dino_data.py --qc                   # figs/d1_views.png
-sbatch src/submit_s8_dino_pretrain.sh --run-name d2_m trainer#max_epochs=11   # D2
+sbatch src/submit_s8_dino_pretrain.sh --run-name trial_2h/big trainer#max_epochs=100   # D2 (2 h, cut by the limit)
 ```
