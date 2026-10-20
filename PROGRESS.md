@@ -522,3 +522,25 @@ limit_train_batches 625, accumulation 15, batch 8, 20 workers, 384-dim / 12 laye
 default base_lr 0.004 / centre momentum 0.99 / clip 3.0 / projection 65,536 vs stable 0.002 / 0.9 /
 1.0 / 16,384. lr = base_lr × √(120/1024). GPU nodes have 128 CPUs (gpu: 7 L40S, gpu-h200: 2 × 4
 H200), so -c 24 / 20 workers per job (d2_s waited 25% on 12 workers). Commands: docs/pipeline.md §8.
+
+## 2026-10-20: small_150ep after ~2.7 h (default) / ~3.6 h (stable) -- both unhealthy
+
+Jobs 5203077 (`default`, at step 1,350 ≈ epoch 32) and 5203078 (`stable`, step 2,000 ≈ epoch 48),
+both on gpu-h200 (H200), 22.4 M backbone, 34,719 scans. 41.7 optimiser steps per epoch.
+
+**GPU utilisation 47% / 40%** (jobinfo): data-bound, data_wait_frac 0.33–0.59 with 20 workers
+(the H200 is ~2× faster than the L40S the 25% wait was measured on). Below GenomeDK's 75% rule;
+not cancelled yet. GPU peak 36.3 GB (default) / 17.3 GB (stable: 16k head).
+
+Collapse monitors (each on one batch of 16 global CLS tokens; losses = median over 100 steps):
+- `default` collapsed harder than the 2 h trial: effective rank of the head output 13.9 → 1.0–1.4
+  (of 16), Gram off-diagonal 0.95–1.00, KoLeo loss turned positive and rising (−0.24 → +2.7:
+  embeddings crowding together); DINO loss back up to 10–12.7 ≈ ln(65,536) = 11.09 (no
+  information); iBOT stuck at 9–12.
+- `stable`: a different failure. DINO loss constant at 9.69 = ln(16,384) from step ~250 on, and
+  teacher entropy exactly 1.000 (uniform): the teacher gives every scan the same flat
+  distribution, so the DINO (CLS) term carries no signal (over-centring: centre momentum 0.9).
+  iBOT (masked patch prediction) keeps falling 9.6 → 2.8, KoLeo stable at −0.55, effective rank
+  14.7/16, last backbone Gram (fallback) 0.02 ± 0.07: the patch-level objective is learning and the
+  backbone CLS tokens differ between scans.
+Checkpoints so far: default epochs 9/19/29, stable 9/19/29/39.
