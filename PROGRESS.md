@@ -467,3 +467,36 @@ so absolute probe C is conservative; comparisons (checkpoint vs random) are like
     sbatch src/submit_s9_dino_features.sh --run d2_s --ckpts random "dino_epoch=009" "dino_epoch=019" "dino_epoch=029" "dino_epoch=039"
     sbatch src/submit_s9_dino_features.sh --run d2_m --ckpts random "dino_epoch=009" "dino_epoch=019"
     sbatch --begin=now+10minutes src/submit_s9_dino_features.sh --run d2_m --ckpts "dino_epoch=029" "dino_epoch=039"
+
+## 2026-10-20: D4/D5 on the d2 checkpoints -- not yet better than random weights
+
+**S9** jobs 5120546 (d2_s, 5 ckpts, 17 min), 5120547/8 (d2_m, 3 + 2 ckpts, 34 / 28 min): 16,345
+patients each, no constant dims. Median per-feature SD: random 0.088 (s) / 0.089 (m) vs trained
+0.19–0.22 (s) / 0.28–0.36 (m).
+
+**S10 probes** (val C; val 2,451 pts / 155 events; penalty chosen on val, so all slightly optimistic,
+equally for every row):
+
+| features | random | ep 9 | ep 19 | ep 29 | ep 39 |
+|---|---|---|---|---|---|
+| d2_s (768 dims) | 0.636 (24 nz) | 0.640 (137) | 0.648 (15) | 0.648 (16) | 0.658 (8) |
+| d2_m (1,728 dims) | 0.649 (30) | 0.636 (63) | 0.616 (14) | 0.633 (21) | 0.645 (95) |
+
+Val references (Cox on train, same split): age 0.585, lung_ml 0.593, clinical 5 (age, sex,
+cigsmok, lung_ml, lung_mean_hu) 0.636; `cosine` (supervised CNN) 0.688.
+
+Paired bootstrap over val patients (1,000×): d2_s ep39 − random +0.022 [−0.008, +0.056];
+d2_m ep39 − random −0.004 [−0.037, +0.028]; d2_s ep39 − cosine −0.030 [−0.067, +0.004].
+Spearman of probe η with lung_ml / lung_mean_hu / age (val): s random +0.52 / −0.49 / +0.10;
+s ep39 +0.48 / −0.38 / +0.07; m random +0.53 / −0.47 / +0.14; m ep39 +0.32 / −0.31 / +0.16;
+cosine +0.18 / −0.17 / +0.23.
+
+Reading: random-weight features already reach the clinical level because they encode lung
+size/density (global statistics of the masked volume survive any random projection). After 40
+short epochs (yr0 only), the small model trends upward but is not significantly above random; the
+big model shows no gain, consistent with the D2 collapse monitors. Trained features lean less on
+lung size (m: ρ 0.53 → 0.32) without being more predictive. Neither reaches cosine.
+Proposed next (not started): small model, full 100 epochs on all 34,719 scans, default recipe vs
+the repo's anti-collapse recipe (exp07: base_lr 0.002, center_momentum 0.9, gradient_clip_val 1.0,
+projection_dim 16384), ~5 h each; same S9/S10 against random. If neither beats random, change the
+input (finer-scale crops) rather than the recipe.

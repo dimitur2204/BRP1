@@ -107,12 +107,17 @@ or clearly above `cosine`.
 - **D4 features** code ✅ (2026-10-19) `src/s9_dino_features.py` + `submit_s9_dino_features.sh`:
   teacher backbone rebuilt from the run's launch.json, whole 144×128×128 yr0 volume, [CLS, mean patch
   token] for all 16,345 cohort patients → `data/features/{run}/{ckpt}.npy`; `random` = same backbone,
-  random weights (control). CPU smoke ✅. ⬜ **user: 3 jobs on the d2 checkpoints (PROGRESS).**
+  random weights (control). CPU smoke ✅. ✅ run on d2 checkpoints (jobs 5120546–8, 17–34 min).
 - **D5 linear probe** code ✅ `src/s10_dino_probe.py`: z-score (train) → elastic-net Cox (l1 0.5,
   50 penalties) on train → penalty by val C → `runs/probe_*/pred.csv` (S4 format, S5 unchanged);
   `--summary` = val C of every probe + `cosine` val C 0.688. No test metric. Synthetic check ✅
   (age + lung volume + noise: val 0.581 vs 0.61 for a Cox on the 2 true columns; pure noise 0.511):
   the probe is conservative; checkpoints and the random control pay the same price.
+  ✅ **d2 probes (val C, 2026-10-20):** d2_s random 0.636 → ep 9/19/29/39 0.640/0.648/0.648/0.658;
+  d2_m random 0.649 → 0.636/0.616/0.633/0.645. Refs: clinical-5 0.636, cosine 0.688. ΔC vs random
+  d2_s +0.022 [−0.008, +0.056], d2_m −0.004 [−0.037, +0.028]; d2_s ep 39 vs cosine −0.030
+  [−0.067, +0.004]. Random features ≈ lung size/density (ρ ±0.5). Not yet better than random.
+  ⬜ **user decision:** full-length small-model runs (default vs anti-collapse recipe) before D3.
 - **D6 fine-tune (optional)** ⬜ the backbone + a linear Cox head trained with `cox_loss`
   (S4-style, low lr, layer decay), vs the same ViT trained from scratch.
 
