@@ -123,7 +123,7 @@ or clearly above `cosine`.
 - **D2b small model, authors' length** ⬜ **user: 2 jobs** (`docs/pipeline.md` §8):
   `runs/dino/small_150ep/{default,stable}`, 34,719 scans, batch 8 × 15 = 120 per step (authors'),
   150 epochs × 5,000 scans = 750k samples, ~15 h each on an L40S. Config dry-run ✅. Then S9
-  (random + every 10th... epochs 29/59/89/119/149) and S10 as for the 2 h trial.
+  (random + checkpoints at epochs 29/59/89/119/149) and S10 as for the 2 h trial.
 - **D6 fine-tune (optional)** ⬜ the backbone + a linear Cox head trained with `cox_loss`
   (S4-style, low lr, layer decay), vs the same ViT trained from scratch.
 
