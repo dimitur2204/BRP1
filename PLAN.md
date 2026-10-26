@@ -28,11 +28,15 @@ no hyperparameter grid.
   `sbatch src/submit_s4_train.sh`** after S3.
 - **S5 evaluate** ✅ code, smoke-tested. ⬜ run after S4.
 
-- **S6 embed** (D1, frozen 3DINO-ViT features) ✅ code, *not run, not
-  smoke-tested* (no GPU/data locally). ⬜ **user:** clone 3DINO to `external/`,
-  download weights to `models/` (licence check first), `sbatch src/submit_s6_embed.sh --limit 8 --out /tmp/s6_smoke.npz`
-  as a smoke test, then the full run.
-- **S7 probe** (linear Cox on frozen features → S5) ✅ code, not run. ⬜ after S6.
+- **S6 embed** (D1, frozen 3DINO-ViT features) ✅ CPU smoke on the login node (2026-10-26).
+  ✅ run (job 6295033, gpu-short L40S, 8 min 50 s, masked input, `--save-tokens`) →
+  `data/embeddings/3dino.npz` + `3dino.tokens.npy` (19 GB), verified.
+- **S7 probe** (elastic-net Cox on frozen features → S5) ✅ val (2026-10-26): cls 0.726, patch 0.719,
+  **cls_patch 0.729** (chosen), last4 0.723; clinical 0.621; `cosine` CNN 0.688.
+  ✅ S5 test: 3DINO 0.647 [0.609, 0.688] (= CNN 0.648), clinical 0.653,
+  3DINO + clinical 0.675 [0.638, 0.713] (= clinical + CNN 0.675). Frozen general SSL
+  matches the supervised CNN; neither clearly beats clinical. Val Spearman 3DINO η vs CNN η 0.66.
+  ⬜ paired ΔC CI vs clinical (S5 extension). ⬜ user decision: next step (unmasked input / D2 / D4).
 
 ## Next direction (2026-10-26, proposal: `docs/directions.md`)
 

@@ -27,7 +27,8 @@ use only). See docs/pipeline.md section 8.
 
 Usage:
     sbatch src/submit_s6_embed.sh                       # -> data/embeddings/3dino.npz
-    env/.venv/bin/python src/s6_embed_3dino.py --limit 8 --out /tmp/x.npz   # smoke (GPU)
+    env/.venv/bin/python src/s6_embed_3dino.py --limit 4 --batch-size 2 --device cpu \
+        --out <scratch>/s6_smoke.npz                     # smoke test (CPU, login node)
 """
 from __future__ import annotations
 
@@ -58,17 +59,25 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--out", default=str(EMB_DIR / "3dino.npz"))
     ap.add_argument("--batch-size", type=int, default=4)
     ap.add_argument("--limit", type=int, default=0, help="first N cohort rows only (smoke test)")
+    ap.add_argument("--device", default="cuda")
     ap.add_argument("--save-tokens", action="store_true")
     return ap.parse_args()
 
 
-def load_model(repo: str, config: str, weights: str):
+def load_model(repo: str, config: str, weights: str, device: torch.device):
+    """Teacher ViT with strictly matched weights. (3DINO's own build_model_for_eval
+    loads with strict=False, falls back to random weights if the file is missing,
+    and always moves to cuda.)"""
     sys.path.insert(0, repo)
     from dinov2.configs import load_and_merge_config_3d
-    from dinov2.eval.setup import build_model_for_eval
-    if not Path(weights).exists():  # build_model_for_eval would silently fall back to random weights
-        raise FileNotFoundError(weights)
-    return build_model_for_eval(load_and_merge_config_3d(config), weights)  # eval mode, on cuda
+    from dinov2.models import build_model_from_cfg
+    model, _ = build_model_from_cfg(load_and_merge_config_3d(config), only_teacher=True)
+    sd = torch.load(weights, map_location="cpu", weights_only=True)
+    sd = sd.get("teacher", sd)
+    sd = {k.replace("module.", "").replace("backbone.", ""): v for k, v in sd.items()}
+    sd = {k: v for k, v in sd.items() if not k.startswith("dino_head") and not k.startswith("ibot_head")}
+    model.load_state_dict(sd, strict=True)
+    return model.to(device).eval()
 
 
 def to_dino_input(u8: torch.Tensor) -> torch.Tensor:
@@ -86,7 +95,8 @@ def to_dino_input(u8: torch.Tensor) -> torch.Tensor:
 @torch.no_grad()
 def embed(model, u8: torch.Tensor):
     x = to_dino_input(u8)
-    with torch.autocast("cuda", dtype=torch.bfloat16):
+    amp = torch.autocast("cuda", dtype=torch.bfloat16) if x.is_cuda else torch.autocast("cpu", enabled=False)
+    with amp:
         layers = model.get_intermediate_layers(x, n=4, reshape=True, return_class_token=True)
     maps = [m.float() for m, _ in layers]                   # 4 x (B, C, 9, 8, 8)
     cls = [c.float() for _, c in layers]                    # 4 x (B, C)
@@ -103,10 +113,12 @@ def main() -> None:
     cohort = pd.read_csv(a.cohort, dtype={"pid": str})
     if a.limit:
         cohort = cohort.head(a.limit)
+    Path(a.out).parent.mkdir(parents=True, exist_ok=True)   # before --save-tokens opens its file
     cache = np.load(a.cache, mmap_mode="r")
     assert cache.shape[1:] == GRID and all(g % PATCH == 0 for g in GRID), cache.shape
-    model = load_model(a.dino_repo, a.config, a.weights)
-    print(f"3DINO loaded; {len(cohort)} patients, batch {a.batch_size}", flush=True)
+    device = torch.device(a.device)
+    model = load_model(a.dino_repo, a.config, a.weights, device)
+    print(f"3DINO loaded on {device}; {len(cohort)} patients, batch {a.batch_size}", flush=True)
 
     n, rows = len(cohort), cohort["row"].to_numpy()
     out = {k: [] for k in ("cls", "patch", "last4")}
@@ -118,7 +130,7 @@ def main() -> None:
     t0 = time.time()
     for i in range(0, n, a.batch_size):
         idx = rows[i:i + a.batch_size]
-        u8 = torch.from_numpy(np.stack([cache[r] for r in idx])).cuda()
+        u8 = torch.from_numpy(np.stack([cache[r] for r in idx])).to(device)
         cls, patch, last4, tok = embed(model, u8)
         out["cls"].append(cls.cpu().numpy())
         out["patch"].append(patch.cpu().numpy())

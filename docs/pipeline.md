@@ -200,7 +200,9 @@ only, no redistribution**; hence `external/` and `models/*.pth` are
 gitignored).
 
 **Input (S6).** The S2 uint8 lung volume, unchanged in geometry (144×128×128 at
-2.5 mm, giving 9×8×8 = 576 tokens; 3DINO interpolates its position encoding). Outside-mask
+2.5 mm, giving 9×8×8 = 576 tokens; 3DINO interpolates its position encoding).
+The weights are loaded with strict key matching (3DINO's own loader uses
+`strict=False` and falls back to random weights if the file is missing). Outside-mask
 voxels are set to the uint8 value of air (60) instead of 0. Then comes 3DINO's own
 scaling: the per-volume 0.05/99.95 percentiles map to −1/1. This is a known deviation
 from pretraining (masked lungs, 2.5 mm). An unmasked-chest input is the
@@ -211,9 +213,12 @@ obvious variant if the probe is weak.
 `last4` ([CLS] of the last 4 layers, 4096). With `--save-tokens`, all 576
 last-layer tokens are also saved as float16 (~19 GB) for regional analyses.
 
-**Probe (S7).** Linear Cox: η = x·w, with features standardised on train. The fit minimises the
-full-batch partial likelihood (`model.cox_loss`) + l2·|w|², by L-BFGS on train.
-l2 is picked from {1e-4 … 10} by val Harrell C. `--clinical` appends age,
+**Probe (S7).** Linear Cox: η = x·w, with features standardised on train. The fit is an elastic-net
+Cox path (sksurv `CoxnetSurvivalAnalysis`, l1_ratio 0.5, 50 penalties down to
+1 % of alpha_max) on train. The penalty is picked by val Harrell C. Not ridge:
+on synthetic data (age hidden among 1,023 noise columns) ridge never found the
+signal at any l2 (val C 0.50), while the elastic net recovers it with 1 non-zero
+coefficient (val C 0.585 = age alone). Pure noise gives val C 0.506. `--clinical` appends age,
 sex and current smoking; `--feature-set none --clinical` is the clinical-only
 reference. Output is the S4 run layout, so `s5_evaluate.py` evaluates it unchanged
 (test is read only there).
@@ -222,7 +227,8 @@ reference. Output is the S4 run layout, so `s5_evaluate.py` evaluates it unchang
 git clone https://github.com/AICONSlab/3DINO external/3DINO
 # accept the licence on huggingface.co/AICONSlab/3DINO-ViT, download
 # 3dino_vit_weights.pth to models/
-env/.venv/bin/pip install omegaconf fvcore iopath   # 3DINO imports; pin per its requirements.txt if needed
+env/.venv/bin/pip install omegaconf                 # the only 3DINO import missing from env/.venv (xformers is optional)
+env/.venv/bin/python src/s6_embed_3dino.py --limit 4 --batch-size 2 --device cpu --out <scratch>/s6.npz  # smoke
 sbatch src/submit_s6_embed.sh                       # data/embeddings/3dino.npz
 for fs in cls patch cls_patch last4; do
   env/.venv/bin/python src/s7_probe.py --feature-set $fs --run-name probe_3dino_$fs

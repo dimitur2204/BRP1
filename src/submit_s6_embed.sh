@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --account   aura_thymus
-#SBATCH --partition gpu
+#SBATCH --partition gpu-short
 #SBATCH --gpus      1
 #SBATCH -c          8
-#SBATCH --mem       32g
-#SBATCH --time      06:00:00
+#SBATCH --mem       48g
+#SBATCH --time      02:00:00
 #SBATCH --job-name  s6_embed
 #SBATCH --output    /faststorage/project/aura_thymus/student_pipeline/logs/s6_%x_%j.out
 #SBATCH --error     /faststorage/project/aura_thymus/student_pipeline/logs/s6_%x_%j.err
@@ -16,7 +16,7 @@
 # Then, on the login node:
 #   env/.venv/bin/python src/s7_probe.py --feature-set cls --run-name probe_3dino_cls
 #   env/.venv/bin/python src/s5_evaluate.py --run probe_3dino_cls
-# The 6 h limit is a guess (16k ViT-L forward passes of 576 tokens); check the
+# 2 h on gpu-short: expected ~15-40 min (one pass over the 39 GB cache, like S9); check the
 # s/patient printed in the log.
 
 set -euo pipefail

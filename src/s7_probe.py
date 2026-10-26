@@ -8,11 +8,13 @@ Cox loss of S4 instead of a classifier:
              --clinical appends age, sex (M=1) and current smoking
              (cigsmok=1). "none --clinical" is the clinical-only reference.
              Standardised with train-split mean/SD.
-  fit        full-batch Cox partial likelihood (model.cox_loss, Breslow)
-             + l2 * |w|^2, L-BFGS, on the train split
-  selection  l2 from a fixed grid by Harrell C on val. Test is not read.
+  fit        elastic-net Cox path (sksurv CoxnetSurvivalAnalysis, Breslow,
+             l1_ratio 0.5, 50 penalties down to 1% of alpha_max) on train.
+             Not ridge: on synthetic data (1 informative column among 1,023
+             noise columns) ridge could not find the signal at any l2.
+  selection  the penalty with the highest Harrell C on val. Test is not read.
 Writes runs/{run_name}/ in the S4 layout, so s5_evaluate.py works unchanged:
-  config.json, probe_grid.csv (val C per l2), pred.csv (eta for all splits).
+  config.json, probe_grid.csv (val C per penalty), pred.csv (eta for all splits).
 
 Usage (login node, CPU, ~minutes):
     env/.venv/bin/python src/s7_probe.py --features data/embeddings/3dino.npz \\
@@ -28,13 +30,10 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import torch
-
-from model import cox_loss, harrell_c
+from model import harrell_c
 from nlst import COHORT_CSV, DATA, RUNS_DIR
 
 FEATURE_SETS = ("cls", "patch", "cls_patch", "last4", "none")
-L2_GRID = (1e-4, 1e-3, 1e-2, 1e-1, 1.0, 10.0)
 
 
 def parse_args() -> argparse.Namespace:
@@ -42,6 +41,8 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--features", default=str(DATA / "embeddings" / "3dino.npz"))
     ap.add_argument("--feature-set", choices=FEATURE_SETS, default="cls")
     ap.add_argument("--clinical", action="store_true", help="append age, sex, current smoking")
+    ap.add_argument("--l1-ratio", type=float, default=0.5)
+    ap.add_argument("--n-alphas", type=int, default=50)
     ap.add_argument("--run-name", required=True)
     ap.add_argument("--cohort", default=str(COHORT_CSV))
     ap.add_argument("--runs-dir", default=str(RUNS_DIR))
@@ -70,20 +71,14 @@ def design(cohort: pd.DataFrame, a) -> tuple[np.ndarray, list[str]]:
     return np.concatenate(blocks, axis=1).astype(np.float64), names
 
 
-def fit_cox(x: torch.Tensor, t: torch.Tensor, e: torch.Tensor, l2: float) -> torch.Tensor:
-    """argmin_w cox_loss(x w) + l2 |w|^2 (convex), by L-BFGS."""
-    w = torch.zeros(x.shape[1], dtype=x.dtype, requires_grad=True)
-    opt = torch.optim.LBFGS([w], lr=1.0, max_iter=500, tolerance_grad=1e-7,
-                            line_search_fn="strong_wolfe")
-
-    def closure():
-        opt.zero_grad()
-        loss = cox_loss(x @ w, t, e) + l2 * (w * w).sum()
-        loss.backward()
-        return loss
-
-    opt.step(closure)
-    return w.detach()
+def fit_path(x: np.ndarray, t: np.ndarray, e: np.ndarray, l1_ratio: float, n_alphas: int):
+    """Elastic-net Cox regularisation path (glmnet-style, Breslow ties) on train."""
+    from sksurv.linear_model import CoxnetSurvivalAnalysis
+    from sksurv.util import Surv
+    m = CoxnetSurvivalAnalysis(l1_ratio=l1_ratio, n_alphas=n_alphas, alpha_min_ratio=0.01,
+                               max_iter=200000, fit_baseline_model=False)
+    m.fit(x, Surv.from_arrays(e.astype(bool), t))
+    return m
 
 
 def main() -> None:
@@ -95,32 +90,33 @@ def main() -> None:
     mu, sd = X[tr].mean(0), X[tr].std(0)
     X = (X - mu) / np.where(sd > 0, sd, 1.0)
 
-    x = torch.from_numpy(X)
-    t = torch.from_numpy(cohort["time"].to_numpy(float))
-    e = torch.from_numpy(cohort["event"].to_numpy(float))
-    trt = torch.from_numpy(tr)
+    t, e = cohort["time"].to_numpy(float), cohort["event"].to_numpy(int)
+    m = fit_path(X[tr], t[tr], e[tr], a.l1_ratio, a.n_alphas)
 
     grid, best = [], None
-    for l2 in L2_GRID:
-        w = fit_cox(x[trt], t[trt], e[trt], l2)
-        eta = (x @ w).numpy()
-        row = {"l2": l2,
-               "train_c": harrell_c(eta[tr], cohort["time"][tr], cohort["event"][tr]),
-               "val_c": harrell_c(eta[va], cohort["time"][va], cohort["event"][va])}
+    for alpha, coef in zip(m.alphas_, m.coef_.T):
+        eta = X @ coef
+        row = {"alpha": float(alpha), "nonzero": int((coef != 0).sum()),
+               "train_c": harrell_c(eta[tr], t[tr], e[tr]),
+               "val_c": harrell_c(eta[va], t[va], e[va])}
         grid.append(row)
-        print(f"l2 {l2:g}: train C {row['train_c']:.4f}  val C {row['val_c']:.4f}", flush=True)
-        if best is None or row["val_c"] > best[0]["val_c"]:
+        if row["nonzero"] and (best is None or row["val_c"] > best[0]["val_c"]):
             best = (row, eta)
+    assert best is not None, "every penalty on the path gave an all-zero model"
+    for row in grid[::max(1, len(grid) // 10)]:
+        print(f"alpha {row['alpha']:.3g}: {row['nonzero']:4d} non-zero  train C {row['train_c']:.4f}  "
+              f"val C {row['val_c']:.4f}", flush=True)
 
     out = Path(a.runs_dir) / a.run_name
     out.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(grid).to_csv(out / "probe_grid.csv", index=False)
-    cfg = {**vars(a), "n_features": len(names), "l2": best[0]["l2"], "val_c": best[0]["val_c"],
+    cfg = {**vars(a), "n_features": len(names), "alpha": best[0]["alpha"],
+           "nonzero": best[0]["nonzero"], "val_c": best[0]["val_c"], "train_c": best[0]["train_c"],
            "n_train": int(tr.sum()), "events_train": int(cohort.loc[tr, "event"].sum())}
     (out / "config.json").write_text(json.dumps(cfg, indent=2))
     cohort[["pid", "split", "time", "event"]].assign(eta=best[1]) \
         .sort_values("pid").to_csv(out / "pred.csv", index=False)
-    print(f"chose l2 {cfg['l2']:g} (val C {cfg['val_c']:.4f}); wrote {out}")
+    print(f"chose alpha {cfg['alpha']:.3g}: {cfg['nonzero']} non-zero, val C {cfg['val_c']:.4f}; wrote {out}")
 
 
 if __name__ == "__main__":

@@ -34,3 +34,5 @@ __pycache__/
 data/embeddings/
 external/
 models/*.pth
+# third-party clone from the earlier DINOv2-3D-Med work (not used on this branch)
+ext/
