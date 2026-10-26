@@ -56,3 +56,29 @@ apparent size; `du` shows ~0.4 GB because the filesystem compresses mostly-zero 
 
 **Next:** user: `s2_preprocess.py --merge` → `--qc` →
 `s3_cohort.py` → `sbatch src/submit_s4_train.sh` → `s5_evaluate.py --run baseline`.
+
+## 2026-10-26: reading → next direction, D1 coded
+
+**Read:** DrasCLR (anatomy-aware contrastive SSL, lung CT), 3DINO (3D DINOv2,
+public ViT-L weights), MAE vs JEPA for 3D brain MRI (objective must match the
+signal; frozen probes good for weak signals). Summary + plan:
+`docs/directions.md`.
+
+**Facts found.**
+- 3DINO weights: `huggingface.co/AICONSlab/3DINO-ViT`, file
+  `3dino_vit_weights.pth`, gated, CC BY-NC-ND 4.0. Inference = percentile
+  scaling to [−1, 1]. `get_intermediate_layers(..., reshape=True)` gives
+  patch maps. Position encoding is interpolated for non-cubic inputs, so
+  144×128×128 → 9×8×8 tokens works without resizing. Repo pins torch 2.0 /
+  Python 3.9 / xformers 0.0.18.
+- 3DINO's pretraining set includes 500 random NLST patients (images only).
+
+**Built (untested, no data/GPU on this machine):** `src/s6_embed_3dino.py`,
+`src/submit_s6_embed.sh`, `src/s7_probe.py` (linear Cox via `cox_loss` +
+L2, L-BFGS, l2 by val C, writes the S4 run layout so S5 is unchanged).
+`docs/pipeline.md` §8. `.gitignore`: `data/embeddings/`, `external/`,
+`models/*.pth`.
+
+**Next:** user: licence check → clone + weights → S6 smoke (`--limit 8`) →
+full S6 → S7 for 4 feature sets + clinical → S5 on each.
+

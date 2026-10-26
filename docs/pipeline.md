@@ -20,6 +20,8 @@ it is reused: no cohort, no split, no cache, no code.
 | S3 cohort | `src/s3_cohort.py` | login node, seconds | `data/cohort.csv`, `data/cohort_attrition.csv`, `data/cohort_splits.csv` |
 | S4 train | `src/s4_train.py` via `submit_s4_train.sh` (1 GPU) | Slurm | `runs/{name}/` |
 | S5 evaluate | `src/s5_evaluate.py --run {name}` | login node | `runs/{name}/eval/` |
+| S6 embed | `src/s6_embed_3dino.py` via `submit_s6_embed.sh` (1 GPU) | Slurm | `data/embeddings/3dino.npz` |
+| S7 probe | `src/s7_probe.py --feature-set ... --run-name {name}` | login node, minutes | `runs/{name}/` (same layout as S4, so S5 evaluates it) |
 
 Shared code: `src/nlst.py` (paths and the whole input definition) and
 `src/model.py` (network, Cox loss, C-index, augmentation).
@@ -181,3 +183,56 @@ Smoke test without Slurm (CPU, ~3 min): run `s2_preprocess.py --pids ...
 - Residual blocks, a cosine lr schedule, or pretrained weights, each tested
   against this baseline one at a time.
 - Clinical adjustment (age, sex, smoking are in `cohort.csv`).
+
+## 8. Frozen foundation-model probe (S6 + S7)
+
+Asks whether a general-purpose self-supervised 3D encoder, used **frozen**, carries
+as much lung-cancer risk information as the CNN trained from scratch on our
+~700 train events. Reasons and the wider plan: `docs/directions.md`.
+
+**Encoder.** 3DINO-ViT (Xu et al., npj Digit. Med. 2025): a ViT-Large with patch size 16,
+pretrained with a 3D DINOv2 objective (image-level [CLS] distillation + masked
+patch prediction) on ~100k unlabeled CT/MRI volumes. That set includes CTs of
+500 random NLST participants, so a few of our patients' images (never labels)
+were seen in pretraining. Code: github.com/AICONSlab/3DINO. Weights:
+huggingface.co/AICONSlab/3DINO-ViT (gated, **CC BY-NC-ND 4.0: non-commercial use
+only, no redistribution**; hence `external/` and `models/*.pth` are
+gitignored).
+
+**Input (S6).** The S2 uint8 lung volume, unchanged in geometry (144×128×128 at
+2.5 mm, giving 9×8×8 = 576 tokens; 3DINO interpolates its position encoding). Outside-mask
+voxels are set to the uint8 value of air (60) instead of 0. Then comes 3DINO's own
+scaling: the per-volume 0.05/99.95 percentiles map to −1/1. This is a known deviation
+from pretraining (masked lungs, 2.5 mm). An unmasked-chest input is the
+obvious variant if the probe is weak.
+
+**Features (S6).** These are from the last 4 layers, layer-normed: `cls` (last [CLS], 1024),
+`patch` (mean of last-layer patch tokens over patches ≥ 50 % lung, 1024),
+`last4` ([CLS] of the last 4 layers, 4096). With `--save-tokens`, all 576
+last-layer tokens are also saved as float16 (~19 GB) for regional analyses.
+
+**Probe (S7).** Linear Cox: η = x·w, with features standardised on train. The fit minimises the
+full-batch partial likelihood (`model.cox_loss`) + l2·|w|², by L-BFGS on train.
+l2 is picked from {1e-4 … 10} by val Harrell C. `--clinical` appends age,
+sex and current smoking; `--feature-set none --clinical` is the clinical-only
+reference. Output is the S4 run layout, so `s5_evaluate.py` evaluates it unchanged
+(test is read only there).
+
+```bash
+git clone https://github.com/AICONSlab/3DINO external/3DINO
+# accept the licence on huggingface.co/AICONSlab/3DINO-ViT, download
+# 3dino_vit_weights.pth to models/
+env/.venv/bin/pip install omegaconf fvcore iopath   # 3DINO imports; pin per its requirements.txt if needed
+sbatch src/submit_s6_embed.sh                       # data/embeddings/3dino.npz
+for fs in cls patch cls_patch last4; do
+  env/.venv/bin/python src/s7_probe.py --feature-set $fs --run-name probe_3dino_$fs
+done
+env/.venv/bin/python src/s7_probe.py --feature-set none --clinical --run-name probe_clinical
+env/.venv/bin/python src/s7_probe.py --feature-set cls --clinical --run-name probe_3dino_cls_clin
+for r in probe_3dino_cls probe_3dino_patch probe_3dino_cls_patch probe_3dino_last4 \
+         probe_clinical probe_3dino_cls_clin; do env/.venv/bin/python src/s5_evaluate.py --run $r; done
+```
+
+Choosing among the 4 feature sets uses val C (printed by S7). Report the test
+numbers of the val-chosen set, not the best test one.
+

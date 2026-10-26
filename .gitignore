@@ -28,3 +28,9 @@ __pycache__/
 *.swp
 *.swo
 *.un~
+
+# S6 frozen foundation-model features + third-party code/weights (CC BY-NC-ND,
+# must not be redistributed) -- regenerate: docs/pipeline.md, section 8.
+data/embeddings/
+external/
+models/*.pth
