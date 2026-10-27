@@ -46,6 +46,7 @@ run name, e.g. `s5_evaluate.py --run cosine_improved_trial/epb4_s0`):
 | `runs/dino/small_150ep/{default,stable}` | DINOv2 small model, authors' run length, default vs anti-collapse recipe |
 | `runs/dino_probe/{dino run}/{ckpt}_{use}` | Cox probes (S10) on the features in `data/features/{dino run}/` |
 | `runs/finetune/{dino_ep39,scratch}` | the DINO ViT fine-tuned with the Cox loss vs the same ViT from scratch (S12) |
+| `runs/clinical_cox/{offset,joint}` | the CNN trained with the clinical covariates in the Cox loss (S4 `--clinical`, §11) |
 
 Shared code: `src/nlst.py` (paths and the whole input definition) and
 `src/model.py` (network, Cox loss, C-index, augmentation).
@@ -359,7 +360,7 @@ Smoke test without Slurm (CPU, ~3 min): run `s2_preprocess.py --pids ...
   `baseline` score correlates ρ 0.65 with lung volume, so the CNN should beat it.
 - Residual blocks or pretrained weights, each tested against the current
   recipe one at a time.
-- Clinical adjustment (age, sex, smoking are in `cohort.csv`).
+- Clinical adjustment (age, sex, smoking are in `cohort.csv`). Built as S4 `--clinical` (§11).
 
 ## 8. Self-supervised pretraining (DINOv2, branch `ssl-dino`)
 
@@ -506,3 +507,37 @@ env/.venv/bin/python src/s5_evaluate.py --run finetune/dino_ep39       # and fin
   AUC is flat from 1 to 5 years and C after 1 y ≥ overall, so it behaves like a general
   lung-risk score, not a detector of visible cancers. Much of η overlaps with age: age's HR per
   year falls from 1.059 to 1.029 when η is added (fitted on val).
+
+## 11. Clinical covariates in the training loss (`s4_train.py --clinical`, branch `cnn-clinical-cox`)
+
+So far the CNN was trained on the image alone and the clinical variables were added only
+afterwards (S5). Its η therefore also learns risk that age, sex, smoking, lung size and density
+already explain (`cosine`: with η in the clinical model, age's HR falls 1.060 → 1.029; scratch
+ViT: η ≈ a lung-size proxy). The goal is a score from general lung features that adds to
+clinical (ΔC over clinical, PROGRESS 2026-10-26). Here the Cox loss sees the clinical covariates
+during training, so the CNN is rewarded only for risk they do not explain:
+
+η_total = η_img(x) + zᵀβ, Cox loss on η_total (`model.ClinicalCox`).
+
+| choice | value | why |
+|---|---|---|
+| covariates | `--clinical age,sex,cigsmok,lung_ml,lung_mean_hu` (= S5's clinical model); sex → male 0/1; z-scored with train mean/SD | the same reference S5 measures ΔC against. `lung_ml` and `lung_mean_hu` are image-derived, so the CNN is pushed away from lung size/density, which `cosine`'s η largely tracked. No missing values in `cohort.csv` |
+| β start | Cox fit of the covariates alone on the train split (lifelines) | the CNN starts from the clinical model and its first updates go to the residual |
+| `--clinical-mode offset` (default) | β fixed | the cleanest "image learns only the residual": η_img is exactly what is added to a fixed clinical model |
+| `--clinical-mode joint` | β trained with the CNN (same lr schedule, no weight decay) | the usual joint model (DeepSurv with covariates). β can trade off against η_img, e.g. lung size may move from β into the image |
+| everything else | the `cosine` recipe (S4 defaults: 80 epochs, peak lr 1e-3, warm-up 3, cosine, batch 32, best val C) | a one-change comparison with `cosine` |
+| selection, logged C | val C of η_total; `history.csv` also logs `val_c_img` (image part alone), `val_c_clin` / `val_loss_clin` (clinical part alone) and `val_img_sd` | η_total is what is trained. `val_c_img` may be *below* `cosine` by design: the image no longer gets credit for age or lung size |
+| `pred.csv` | `eta` = η_img (image part), `eta_clin`, `eta_total`; `clinical.json`: columns, mean/SD, β start/selected, clinical-only val C/loss | S5 runs unchanged on `eta` = the image part, so its ΔC (clinical + η − clinical, refit on val) is exactly the question; "η alone" in S5 is the residual score and is expected to be weak |
+| input | the 2.5 mm `data/cache/lungs_u8.npy` (S2; the "big cut" used by every run so far). S4 stops if the cache volumes are not 144×128×128, so the 1.4 mm cache (`lungs_1p4mm_u8.npy`, another pipeline) cannot be used by mistake | same input as `cosine` |
+
+Without `--clinical`, S4 is unchanged (same model, `model.pt` keys and `pred.csv`). `s6_saliency.py`
+loads a plain `LungCNN` and does not read `ClinicalCox` checkpoints (keys `image.*`, `beta`).
+
+```bash
+sbatch src/submit_s4_train.sh --run-name clinical_cox/offset --clinical age,sex,cigsmok,lung_ml,lung_mean_hu
+sbatch --begin=now+20minutes src/submit_s4_train.sh --run-name clinical_cox/joint \
+  --clinical age,sex,cigsmok,lung_ml,lung_mean_hu --clinical-mode joint
+env/.venv/bin/python src/s5_evaluate.py --run clinical_cox/offset     # and clinical_cox/joint
+```
+
+Success: test ΔC above `cosine`'s +0.021 [−0.017, +0.058], ideally with a CI > 0, and C after 1 y.

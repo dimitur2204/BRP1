@@ -167,3 +167,16 @@ lung-cancer ΔC CI > 0.
 - **T1 segmenter env + array** ⬜ (after T0)
 - **T2 thymic-bed crop cache** (50×50×75 mm, 1 mm, soft-tissue window, unmasked) ⬜
 - **T3 SSL on crops** (DINO with smaller views, and/or their SwAV recipe) ⬜ → S9/S10 + score probe
+
+# Next: clinical covariates in the training loss, branch `cnn-clinical-cox`
+
+Branch `cnn-clinical-cox` (from `ssl-dino`), 2026-10-27. Design: `docs/pipeline.md` §11. Idea from
+2026-10-26 (PROGRESS): put the clinical covariates into the training Cox model so the CNN learns
+only the risk they do not explain (goal: general lung features with ΔC over clinical > 0).
+
+- **C1 code** ✅ (2026-10-27) `s4_train.py --clinical age,sex,cigsmok,lung_ml,lung_mean_hu
+  --clinical-mode {offset,joint}` (`model.ClinicalCox`), otherwise the `cosine` recipe. Input: the
+  2.5 mm `lungs_u8.npy` cache (as every run so far, not the new 1.4 mm cache). CPU smoke: PROGRESS.
+- **C2 runs** ⬜ **user:** `runs/clinical_cox/offset` and `runs/clinical_cox/joint` (commands in
+  §11), then S5 on both. Compare test ΔC with `cosine` (+0.021) and `finetune/dino_ep39` (+0.027).
+- ⬜ Same idea for the DINO ViT fine-tune (S12), if C2 helps.

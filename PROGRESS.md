@@ -714,3 +714,31 @@ S5 (test): η C 0.571 [0.524, 0.614], below age alone (0.630); C after 1 y 0.568
 flips to HR 0.34 per SD while `lung_ml` grows (1.0002 → 1.0010 per ml): the scratch η is mostly
 a lung-size proxy. Adjusted for sex and smoking only, HR 1.37 per SD, high vs low tertile 1.73. Results
 table in `docs/pipeline.md` §10.
+
+## 2026-10-27: clinical covariates in the training loss (branch `cnn-clinical-cox`)
+
+**Why.** `cosine`'s η partly re-learns age and lung size/density (age HR 1.060 → 1.029 with η in
+the model; S6: a lung size/inflation score). Goal (2026-10-26): general lung features with added
+value over clinical. So the clinical covariates go into the training Cox model and the CNN is
+rewarded only for the residual. Design: `docs/pipeline.md` §11.
+
+**Built.** `s4_train.py --clinical age,sex,cigsmok,lung_ml,lung_mean_hu --clinical-mode
+{offset,joint}`, `model.ClinicalCox` (η = η_img + zᵀβ, z standardised on train, β started at a
+train-fit clinical Cox; offset = β fixed, joint = β trained, no weight decay, z @ β in fp32
+outside autocast). Selection on val C of η_total; history adds `val_c_img`, `val_c_clin`,
+`val_loss_clin`, `val_img_sd`. `pred.csv` `eta` = image part (S5 unchanged), plus `eta_clin`,
+`eta_total`; `clinical.json`. S4 now stops if the cache is not 144×128×128 (guards against the
+other pipeline's new 1.4 mm cache `lungs_1p4mm_u8.npy`; we use the 2.5 mm `lungs_u8.npy`,
+untouched since 2026-10-05). Runs go to `runs/clinical_cox/{offset,joint}` in `plamen_pipeline`.
+
+**Facts.** No missing age/sex/cigsmok/lung_ml/lung_mean_hu in `cohort.csv` (M 9,748 / F 6,597).
+
+**CPU smoke (cluster login node, 48-patient cohort: 16 per split, 6 events each, full-size
+volumes, 3 epochs, ~12 min per run).** plain, offset and joint (+ EMA 0.99) all ran end to end.
+Offset: β_selected = β_start (to fp32 precision), `val_c_clin` / `val_loss_clin` constant across
+epochs, `eta_total = eta + eta_clin` in `pred.csv`. Joint: `val_loss_clin` changes between epochs
+(4.6562 → 4.6572), so β trains. Not checked (SSH session expired): `pred.csv` of a plain run vs
+the `ssl-dino` S4 (code path without `--clinical` is unchanged by reading).
+
+**Next (user):** copy the code to `plamen_pipeline`, then `clinical_cox/offset` and
+`clinical_cox/joint` (§11), then S5 on both.

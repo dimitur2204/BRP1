@@ -8,6 +8,7 @@ Kept deliberately small and plain so it is easy to read, debug and extend:
              one linear output = the log-risk score eta. GroupNorm (not
              BatchNorm) means train and eval mode compute the same function,
              whatever the batch size.
+  ClinicalCox  LungCNN + a linear term in clinical covariates (s4 --clinical).
   cox_loss   negative Cox partial log-likelihood (Breslow ties) over the
              patients in a batch.
   harrell_c  Harrell's concordance index (higher eta = earlier event).
@@ -44,6 +45,25 @@ class LungCNN(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:      # x: (B, 1, X, Y, Z) in [0, 1]
         return self.head(self.features(x)).squeeze(1)        # (B,) log-risk eta
+
+
+class ClinicalCox(nn.Module):
+    """Cox model with clinical covariates next to the image: eta = image(x) + z @ beta.
+
+    z are standardised clinical covariates. beta starts at a clinical-only Cox
+    fit and is either fixed (an offset: the image learns only the risk the
+    covariates do not explain) or trained jointly with the image network."""
+
+    def __init__(self, image: nn.Module, beta0, train_beta: bool):
+        super().__init__()
+        self.image = image
+        self.beta = nn.Parameter(torch.as_tensor(np.asarray(beta0), dtype=torch.float32),
+                                 requires_grad=train_beta)
+
+    def forward(self, x: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+        eta = self.image(x).float()
+        with torch.autocast(device_type=x.device.type, enabled=False):  # keep z @ beta in fp32
+            return eta + z.float() @ self.beta
 
 
 def to_input(u8: torch.Tensor) -> torch.Tensor:

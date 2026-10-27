@@ -12,6 +12,8 @@
 # S4 -- train one lungs 3D CNN run. All arguments are passed to s4_train.py:
 #   sbatch src/submit_s4_train.sh --run-name cosine                # current defaults, seed 0
 #   sbatch src/submit_s4_train.sh --run-name cosine_s1 --seed 1
+#   sbatch src/submit_s4_train.sh --run-name clinical_cox/offset --clinical age,sex,cigsmok,lung_ml,lung_mean_hu
+#   (clinical covariates in the Cox loss, docs/pipeline.md section 11; add --clinical-mode joint for clinical_cox/joint)
 # Then: env/.venv/bin/python src/s5_evaluate.py --run cosine
 # A finished run directory is never overwritten (new --run-name or --overwrite).
 # Runs under 2 h (e.g. --epochs 40, ~50 min) can go to the gpu-short partition (8 L40S,
