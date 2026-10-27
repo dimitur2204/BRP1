@@ -28,6 +28,12 @@ it is reused: no cohort, no split, no cache, no code.
 | S8 DINOv2 pretrain | `src/s8_dino_pretrain.py` via `submit_s8_dino_pretrain.sh` (1 GPU) | Slurm | `runs/dino/{name}/` |
 | S9 DINOv2 features | `src/s9_dino_features.py` via `submit_s9_dino_features.sh` (1 GPU) | Slurm | `data/features/{run}/{ckpt}.npy` |
 | S10 Cox probe | `src/s10_dino_probe.py` (`--summary`) | login node, minutes | `runs/dino_probe/{run}/{ckpt}_{use}/` (S4 format → S5) |
+| S11 thymus score | `src/s11_thymus_score.py` | login node, ~1 min | `runs/thymus_score/` |
+| S12 ViT fine-tune (D6) | `src/s12_dino_finetune.py` via `submit_s12_dino_finetune.sh` (1 GPU, ~4 h on an L40S) | Slurm | `runs/finetune/{name}/` (S4 format → S5) |
+
+Cluster folder (since 2026-10-26): `/faststorage/project/aura_thymus/plamen_pipeline`. The large
+shared items (`data/cache`, `data/external`, `env`, `ext`, the runs up to 2026-10-20) are symlinks
+into `student_pipeline/`, which another pipeline now uses; new runs and logs live here.
 
 Run folders (`runs/`, regrouped 2026-10-20; every script takes the path below `runs/` as the
 run name, e.g. `s5_evaluate.py --run cosine_improved_trial/epb4_s0`):
@@ -39,6 +45,7 @@ run name, e.g. `s5_evaluate.py --run cosine_improved_trial/epb4_s0`):
 | `runs/dino/trial_2h/{small,big}` | DINOv2 2 h trial pretraining (D2; were `d2_s` / `d2_m`) |
 | `runs/dino/small_150ep/{default,stable}` | DINOv2 small model, authors' run length, default vs anti-collapse recipe |
 | `runs/dino_probe/{dino run}/{ckpt}_{use}` | Cox probes (S10) on the features in `data/features/{dino run}/` |
+| `runs/finetune/{dino_ep39,scratch}` | the DINO ViT fine-tuned with the Cox loss vs the same ViT from scratch (S12) |
 
 Shared code: `src/nlst.py` (paths and the whole input definition) and
 `src/model.py` (network, Cox loss, C-index, augmentation).
@@ -414,3 +421,88 @@ env/.venv/bin/python src/s7_ssl_cache.py --merge
 env/.venv-dino/bin/python src/dino_data.py --qc                   # figs/d1_views.png
 sbatch src/submit_s8_dino_pretrain.sh --run-name trial_2h/big trainer#max_epochs=100   # D2 (2 h, cut by the limit)
 ```
+
+## 9. Thymus step 0: the published thymic-health score (`src/s11_thymus_score.py`)
+
+Before building a thymus SSL model we measure how much a thymus model can tell us here.
+The AIM-Harvard thymic-health score (Bernatz et al. 2026, *Nature*; per-participant CSV on
+Zenodo 10.5281/zenodo.18306999, path `THYMUS_SCORE_CSV` in `src/nlst.py`) is a 0–100
+percentile per NLST participant (higher = less fatty thymus) from their full system
+(thymic-bed segmenter → SwAV ResNet-50 → classifier fine-tuned on expert involution grades).
+It is roughly the ceiling for a thymus model, and later the label-free target for "did our
+SSL learn thymus anatomy".
+
+- **Test patients are never read.** Cohort and reference predictions are cut to train + val
+  on load. Complete cases only (score present).
+- **Discrimination:** Cox models fitted on train, Harrell C on val, 1,000× patient bootstrap,
+  paired ΔC for clinical → clinical + thymus and clinical + η → clinical + η + thymus
+  (clinical = S5's 5 variables, η = `runs/cosine`). Models containing η are fitted on val,
+  because η was trained on the train patients (as S5 `--fit-split val`); both sides of that ΔC
+  are fitted the same way.
+- **HR per SD** (train SD): train + val for unadjusted / + age / + age, sex, smoking /
+  + clinical; val only for + clinical + η, with a likelihood-ratio test of adding the score.
+- **Histology:** cause-specific Cox (other cancers censored), adenocarcinoma vs the rest
+  (prsn `de_type`, ICD-O-3 codes as in the thymus-heart-aging E3/E5 analyses).
+- **All-cause death:** if prsn has `death_days` / `fup_days`, time from T0 as for the outcome.
+
+```bash
+env/.venv/bin/python src/s11_thymus_score.py      # login node, ~1 min → runs/thymus_score/
+```
+
+## 10. Fine-tuning the DINO ViT with the Cox loss (`src/s12_dino_finetune.py`, D6)
+
+The S10 probe asks whether cancer risk can be read **linearly from frozen** DINO features (val C
+0.658, below `cosine` 0.688). Fine-tuning asks the other question: does starting from the DINO
+weights help when **every** weight learns from the cancer labels, as the CNN did in S4? Only 724
+train events is little for a 22 M-parameter ViT from scratch (ViTs lack the CNN's locality
+prior), so pretrained weights can help even when the linear probe is weak. The test is the same
+ViT trained twice with the same script: from the DINO weights vs from random weights.
+
+| choice | value | why |
+|---|---|---|
+| runs | `finetune/dino_ep39`: teacher of `small_150ep/stable` epoch 39; `finetune/scratch`: same backbone with random weights (seed 0, = S9's `random`) | epoch 39 is the checkpoint already probed (S10 was flat from epoch 9). The teacher, as in S9 |
+| network | backbone rebuilt from the pretraining `launch.json` (S9's `load_model`, strict load); DINO/iBOT heads, student and the unused `up_projection` decoder are not trained | architecture and weights always match pretraining; drop-path / attention dropout 0.2 / 0.2 as pretrained |
+| input / augment | whole 144×128×128 S2 volume (18×16×16 tokens, position embedding resampled from 12³), S4's `augment` | same view as `cosine`, S9 and S10 |
+| head | [CLS, mean patch token] (768) → dropout 0.3 → Linear(768 → 1), zero-initialised, no bias | the S10 probe's features, so probe vs fine-tune is like for like. η = 0 at the start, so the first updates do not push a random head's noise into the pretrained blocks. A constant shift of η does not change the Cox loss |
+| loss / batch | S4's `cox_loss` over 32 patients per batch; batches without events skipped (as S4) | the risk set must be in one forward pass, so no gradient accumulation. Block activations are recomputed in the backward pass (gradient checkpointing, default on; `--no-grad-checkpoint` to disable): without it batch 32 ran out of memory on an L40S (> 44 GB, job 6287322) |
+| learning rates | head peak 1e-3 (as S4); backbone peak 1e-4 × layer decay 0.75: block *i* of 12 (0-based) × 0.75^(12−*i*), cls/position/patch embedding × 0.75^13 (3e-6 for the first block), final norm × 1. 3 warm-up epochs, cosine to 0, per batch | standard fine-tuning: the top blocks adapt, the early (local anatomy) filters barely move. **Scratch:** `--layer-decay 1.0 --lr-backbone 1e-3` (everything at 1e-3): layer decay only exists to protect pretrained weights and would freeze random early blocks |
+| optimiser | AdamW, weight decay 0.05 (0 for biases, norms, layer-scale gammas, cls/position embedding), gradient-norm clip 1.0 | usual ViT fine-tuning settings; both runs identical |
+| length / selection | 30 epochs, last epoch kept | ~12.5 min per epoch on an L40S (measured; ~7 h per run plus up to ~45 min cache load), so 80 epochs (S4) would be ~17 h. Pretrained fine-tunes usually settle within 20–30 epochs. A scratch curve still rising at epoch 30 is noted as a limit of the comparison |
+| outputs | S4 format (`config.json`, `history.csv` + `lr_backbone`, `grad_norm`, `model.pt`, `pred.csv` for all splits, `curves.png`) | S5 evaluates it unchanged; test rows are only read by S5 |
+| C index | `harrell_c_np` in S12 | `env/.venv-dino` has no scikit-survival; identical to sksurv on synthetic data with tied times/scores and on `cosine` val (0.68839) |
+
+Repo bug: `Eva.set_grad_checkpointing()` calls the reentrant `torch.utils.checkpoint` with
+`rope=` as a keyword, which it rejects; S12 wraps each block's forward with the non-reentrant
+version instead (parameter names unchanged). `--smoke` crops each volume to a central 64³
+because whole-lung attention on CPU exceeds the login node's ~16 GB; the full-size memory and
+speed check is a short GPU job.
+
+```bash
+sbatch -p gpu-short -t 00:45:00 src/submit_s12_dino_finetune.sh --run-name finetune/timing \
+  --ckpt "dino_epoch=039" --epochs 2                                   # memory + s/epoch
+sbatch src/submit_s12_dino_finetune.sh --run-name finetune/dino_ep39 --ckpt "dino_epoch=039"
+sbatch --begin=now+15minutes src/submit_s12_dino_finetune.sh --run-name finetune/scratch \
+  --ckpt random --layer-decay 1.0 --lr-backbone 1e-3
+env/.venv/bin/python src/s5_evaluate.py --run finetune/dino_ep39       # and finetune/scratch
+```
+
+**Results (2026-10-27).** S5, 155 events in each of val and test; ΔC = clinical + η − clinical
+(clinical = age, sex, cigsmok, lung_ml, lung_mean_hu; Cox models fitted on val, bootstrap on test).
+
+| | `cosine` CNN | `finetune/dino_ep39` | `finetune/scratch` |
+|---|---|---|---|
+| val C (last epoch) | 0.688 | 0.690 | 0.583 |
+| test C (η alone) | 0.648 | 0.654 | 0.571 |
+| test C after 1 y | 0.653 | 0.664 | 0.568 |
+| test ΔC over clinical (0.654) | +0.021, p 0.135 | +0.027 [−0.009, +0.063], p 0.083 | −0.001, p 0.548 |
+| test HR per SD η, adjusted for sex + smoking | — | 1.69 | 1.37 |
+
+- **The DINO initialisation is what makes the ViT work.** From random weights the same recipe
+  never fitted the training set (train C 0.53, η SD 0.03 against 0.75; gradient spikes up to
+  ~200 at the peak lr). Its weak signal is lung size: with clinical in the model its η flips sign
+  (HR 0.34) next to `lung_ml`. A lower lr might help a little, but 724 events are too few for a
+  ViT without pretraining.
+- **Fine-tuned DINO ≈ the CNN**, slightly ahead on every test number, nothing significant. Its
+  AUC is flat from 1 to 5 years and C after 1 y ≥ overall, so it behaves like a general
+  lung-risk score, not a detector of visible cancers. Much of η overlaps with age: age's HR per
+  year falls from 1.059 to 1.029 when η is added (fitted on val).

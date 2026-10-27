@@ -2,9 +2,9 @@
 # ext/DINOv2-3D-Med/configs/train.yaml and configs/models/primus.yaml (later files override
 # `a#b` keys). Our modules (src/dino_data.py, src/dino_callbacks.py) are found via PYTHONPATH=src,
 # set by src/submit_s8_dino_pretrain.sh. Design notes: docs/pipeline.md, PLAN.md (D1-D3).
-project: "/faststorage/project/aura_thymus/student_pipeline/ext/DINOv2-3D-Med"
+project: "/faststorage/project/aura_thymus/plamen_pipeline/ext/DINOv2-3D-Med"
 run_name: "dino_smoke"
-runs_dir: "/faststorage/project/aura_thymus/student_pipeline/runs/dino"
+runs_dir: "/faststorage/project/aura_thymus/plamen_pipeline/runs/dino"
 img_size: [96, 96, 96]                  # global view size (2.0-3.3 mm effective, see dino_data.py)
 
 trainer#devices: 1

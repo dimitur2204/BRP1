@@ -6,8 +6,8 @@
 #SBATCH --mem       32g
 #SBATCH --time      02:00:00
 #SBATCH --job-name  s9_feat
-#SBATCH --output    /faststorage/project/aura_thymus/student_pipeline/logs/s9_%x_%j.out
-#SBATCH --error     /faststorage/project/aura_thymus/student_pipeline/logs/s9_%x_%j.err
+#SBATCH --output    /faststorage/project/aura_thymus/plamen_pipeline/logs/s9_%x_%j.out
+#SBATCH --error     /faststorage/project/aura_thymus/plamen_pipeline/logs/s9_%x_%j.err
 
 # S9 -- DINOv2 features for all cohort patients. All arguments go to s9_dino_features.py:
 #   sbatch src/submit_s9_dino_features.sh --run trial_2h/small --ckpts random "dino_epoch=009" ...
@@ -17,7 +17,7 @@
 # Then (login node): env/.venv/bin/python src/s10_dino_probe.py --run <run> --ckpt <ckpt>
 
 set -euo pipefail
-PROJECT=/faststorage/project/aura_thymus/student_pipeline
+PROJECT=/faststorage/project/aura_thymus/plamen_pipeline
 mkdir -p "$PROJECT/logs"
 export WANDB_MODE=disabled
 export PYTHONPATH="$PROJECT/src"

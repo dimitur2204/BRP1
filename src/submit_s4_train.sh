@@ -6,8 +6,8 @@
 #SBATCH --mem       96g
 #SBATCH --time      12:00:00
 #SBATCH --job-name  s4_train
-#SBATCH --output    /faststorage/project/aura_thymus/student_pipeline/logs/s4_%x_%j.out
-#SBATCH --error     /faststorage/project/aura_thymus/student_pipeline/logs/s4_%x_%j.err
+#SBATCH --output    /faststorage/project/aura_thymus/plamen_pipeline/logs/s4_%x_%j.out
+#SBATCH --error     /faststorage/project/aura_thymus/plamen_pipeline/logs/s4_%x_%j.err
 
 # S4 -- train one lungs 3D CNN run. All arguments are passed to s4_train.py:
 #   sbatch src/submit_s4_train.sh --run-name cosine                # current defaults, seed 0
@@ -23,7 +23,7 @@
 # (~27 GB of train volumes are held in host RAM, hence --mem 96g.)
 
 set -euo pipefail
-PROJECT=/faststorage/project/aura_thymus/student_pipeline
+PROJECT=/faststorage/project/aura_thymus/plamen_pipeline
 mkdir -p "$PROJECT/logs"
 source "$PROJECT/env/.venv/bin/activate"
 python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else '')"

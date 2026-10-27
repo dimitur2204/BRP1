@@ -124,8 +124,16 @@ or clearly above `cosine`.
   `runs/dino/small_150ep/{default,stable}`, 34,719 scans, batch 8 × 15 = 120 per step (authors'),
   150 epochs × 5,000 scans = 750k samples, ~15 h each on an L40S. Config dry-run ✅. Then S9
   (random + checkpoints at epochs 29/59/89/119/149) and S10 as for the 2 h trial.
-- **D6 fine-tune (optional)** ⬜ the backbone + a linear Cox head trained with `cox_loss`
-  (S4-style, low lr, layer decay), vs the same ViT trained from scratch.
+- **D6 fine-tune** code ✅ (2026-10-26) `src/s12_dino_finetune.py` + `submit_s12_dino_finetune.sh`
+  (`docs/pipeline.md` §10). Decided (user): `stable` epoch-39 teacher; 30 epochs; scratch run
+  without layer decay. Runs: `finetune/dino_ep39` vs `finetune/scratch` (same recipe, random
+  weights), reference `cosine`. CPU smoke ✅ (64³ crop). Timing job 6287322: out of GPU memory at batch 32 → gradient
+  checkpointing on by default. Cluster folder is now `plamen_pipeline` (PROGRESS 2026-10-26).
+  ✅ `finetune/dino_ep39` (2026-10-26): val C 0.691 (cosine 0.687, probe 0.658); test η 0.654,
+  clinical + η 0.681, ΔC +0.027 [−0.009, +0.063] (cosine +0.021) → ≈ CNN, not significant.
+  ✅ `finetune/scratch` (2026-10-27): did not learn (train C 0.53, val C 0.583, η sd 0.03; test η 0.571, ΔC −0.001) →
+  DINO init is what makes the ViT work. Goal (user): general lung features, no nodule detection;
+  judge by ΔC over clinical (PROGRESS 2026-10-26).
 
 ## Open items (D0)
 
@@ -141,3 +149,21 @@ Checked on GenomeDK 2026-10-18:
 - No W&B account (user) → `WANDB_MODE=disabled`, Lightning `CSVLogger`; check the repo's collapse
   callbacks log to it.
 - ⬜ GPU budget for D3.
+
+# Next: thymus hypothesis (2026-10-20)
+
+Idea (user): if SSL "learns the anatomy" (as in AIM-Harvard's thymus system), pretrain on
+thymic-bed crops instead of lungs. Thymus is not in TotalSegmentator → their thymic-bed segmenter
+(`vprudente/open_thymus_segmentator`, weights Zenodo 10.5281/zenodo.18355851). Expected lung-cancer
+signal is small (E5: TH HR 0.91/SD adjusted, non-adeno only), so success is judged on (1) SSL
+features predicting the published score, (2) HR/SD significance, (3) all-cause death, not on a
+lung-cancer ΔC CI > 0.
+
+- **T0 published score on our cohort** ✅ (2026-10-20) `src/s11_thymus_score.py` → `runs/thymus_score/`.
+  HR/SD 0.878 [0.817, 0.943] + clinical (train + val, 864 events), non-adeno only (0.853 vs adeno 0.950).
+  Val C alone 0.548; ΔC over clinical +0.004 [−0.006, +0.013]; over clinical + η 0.000 (LR p 0.57).
+  → A thymus model cannot raise lung-cancer C here; no death data in public prsn.
+  ⬜ **user decision:** stop, or continue T1–T3 for the anatomy question only (probe = published score).
+- **T1 segmenter env + array** ⬜ (after T0)
+- **T2 thymic-bed crop cache** (50×50×75 mm, 1 mm, soft-tissue window, unmasked) ⬜
+- **T3 SSL on crops** (DINO with smaller views, and/or their SwAV recipe) ⬜ → S9/S10 + score probe

@@ -12,7 +12,7 @@
 # Safe to re-run: every step skips what is already there.
 
 set -euo pipefail
-PROJECT=/faststorage/project/aura_thymus/student_pipeline
+PROJECT=/faststorage/project/aura_thymus/plamen_pipeline
 REPO_URL=https://github.com/AIM-Harvard/DINOv2-3D-Med
 REPO_COMMIT=77bde4d                       # 2026-08-04, the version read for PLAN.md
 UV_VERSION=0.8.22

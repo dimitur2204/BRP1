@@ -557,3 +557,160 @@ and agree more with the supervised CNN's risk score (ρ 0.74), but their linear 
 better than the 2 h trial's, not clearly above random weights, and significantly below cosine.
 Longer training does not help (flat from epoch 9). The authors' recipe on this input does not
 give a better linear probe.
+
+## 2026-10-20: thymus hypothesis, step 0 (S11) written
+
+User idea: test the "SSL learns anatomy" hypothesis on the thymus, following AIM-Harvard's
+thymus_health_deeplearning_system. Their system is SwAV (ResNet-50, 50×50×75 mm patches at 1 mm
+around the segmented thymic-bed centroid, HU [−1024, 3072]) + a classifier fine-tuned on expert
+involution grades, not DINO and not label-free. Their segmenter (MONAI bundle, MONAI 1.1 / torch
+1.12, 96³ patches) is public, the SSL weights are not. From E5 (thymus-heart-aging): published TH
+HR 0.85/SD unadjusted, 0.91 [0.85, 0.97] age/sex/smoking-adjusted, all of it non-adenocarcinoma →
+an expected lung-cancer ΔC of ~0.01, under our val/test ΔC CI half-width (~0.04). So the bar is
+changed (PLAN).
+
+**S11** (`src/s11_thymus_score.py`): the published score (`THYMUS_SCORE_CSV`, already on the
+cluster at `discovery_pipeline/NLST_thymic_health_scores_published.csv`) joined to cohort.csv;
+train + val only. Coverage, Spearman with clinical + η, val C / paired ΔC (Cox on train; η models
+on val), HR/SD (train + val; val with η + LR test), adeno vs non-adeno, all-cause death (if prsn
+has death_days / fup_days). Synthetic smoke test (scratch venv, real cohort + cosine pred, fake
+score with a planted effect, 95% coverage): all tables produced, 3.5 s.
+
+**S11 run (login node, ~1.5 min):** the public prsn has no death columns at all (only candx_days /
+canc_free_days), so all-cause/CVD death cannot be tested without the CDAS release.
+Coverage: 13,482/13,893 train + val (97%) have a score; the 411 without have fewer events (3.6% vs
+6.4%), more women, smaller lungs.
+Spearman with the score: male −0.27, age −0.19, lung_ml −0.15, cigsmok +0.06 (current smokers are
+younger), lung_mean_hu +0.05, cosine η −0.12 (val).
+
+| val (2,394 / 154 events) | C [95% CI] |
+|---|---|
+| age | 0.585 [0.540, 0.625] |
+| clinical 5 | 0.637 [0.594, 0.679] |
+| thymus alone | 0.548 [0.500, 0.593] |
+| clinical + thymus | 0.641 → ΔC +0.004 [−0.006, +0.013] |
+| η (cosine) | 0.689 [0.644, 0.733] |
+| clinical + η (fit on val) | 0.703 |
+| clinical + η + thymus | 0.703 → ΔC −0.000 [−0.003, +0.002], LR p 0.57 |
+
+HR/SD (train + val, 864 events): unadjusted 0.843 [0.788, 0.902]; + age 0.910 [0.849, 0.975];
++ age/sex/smoking 0.893 [0.832, 0.958]; + clinical 5 0.878 [0.817, 0.943], p < 0.001. Val only:
++ clinical 0.877 [0.738, 1.042]; + clinical + η 0.951 [0.800, 1.130]. Cause-specific (age/sex/
+smoking): adeno 0.950 [0.857, 1.053] (403 events), non-adeno 0.853 [0.772, 0.942] (449), as in E5.
+Reading: the published thymus score is a real, independent, non-adenocarcinoma risk factor (HR/SD
+~0.88), but it does not measurably raise C, and adds nothing to clinical + the lung CNN. The
+pre-run estimates (C alone 0.53–0.56, ΔC +0.005–0.01) held. A thymus SSL model, at best equal to
+this score, cannot improve lung-cancer discrimination here.
+
+## 2026-10-26: D6 fine-tuning (S12) written
+
+**Question.** Does the DINO pretraining help when the whole ViT is trained with the Cox loss
+(S4-style), not just a linear probe on frozen features? Same ViT twice: from the `stable`
+epoch-39 teacher vs from random weights; `cosine` as reference. Design: `docs/pipeline.md` §10.
+User decisions: epoch 39, 30 epochs, scratch without layer decay.
+
+**Facts found.**
+- `stable` stopped after epoch 69 (checkpoints 9–69 + last; no job running).
+- Teacher backbone parameters: `cls_token`, `down_projection` (= patch embedding), `vit.pos_embed`
+  (1,729 × 384), 12 × `vit.blocks.N.*` (incl. `gamma_1/2` layer scale), `vit.norm`, plus the
+  unused `up_projection` decoder (10 tensors); `mask_token`, `vit.rope.periods` are buffers.
+- The repo's layer decay matches `patch_embed`, but Primus calls it `down_projection`, so in
+  pretraining the patch embedding got the full lr (cosmetic for us; S12 has its own groups).
+- `Eva.set_grad_checkpointing()` is broken (reentrant checkpoint rejects `rope=`); S12 patches
+  each block with the non-reentrant checkpoint.
+- `env/.venv-dino` has no scikit-survival → `harrell_c_np` in S12.
+- Speed estimate from S9 (`stable`, 5 checkpoints × 16,345 patients in 953 s ≈ 86 forward/s on
+  L40S): training ~25–30 patients/s → ~7–8 min/epoch, 30 epochs ≈ 4 h (L40S), ~2–2.5 h (H200).
+
+**Checks (cluster login node, CPU).**
+- Optimiser: 28 groups (12 blocks × wd/no-wd, embeddings, final norm, head); only
+  `up_projection` untrained; peak lr head 1e-3, top block 7.5e-5, first block 3.2e-6. Scratch
+  flags give 2 groups, all at 1e-3.
+- A full-size CPU smoke test is impossible on the login node: killed at 16.7 GB RSS (whole-lung
+  attention on CPU) even with checkpointing. `--smoke` therefore uses a central 64³ crop: 16-patient
+  cohort, 2 epochs, 70 s, 3.2 GB; history, model.pt, pred.csv (all splits, S4 format), curves.png
+  written; overwrite guard works; also ran with `--ckpt random`.
+- `harrell_c_np` = sksurv `concordance_index_censored` to 8 decimals on 5 synthetic sets with tied
+  times and scores (n 3,000), and on `cosine` val (0.68839 both).
+
+**Next (user):** timing job (`gpu-short`, 2 epochs: GPU memory at batch 32, s/epoch; add
+`--grad-checkpoint` if it runs out of memory), then `finetune/dino_ep39` and `finetune/scratch`
+(30 epochs), then S5 on both. Commands: `docs/pipeline.md` §10.
+
+**Timing job 6287322 (gpu-short L40S): out of GPU memory** in the first training forward pass at
+batch 32 without checkpointing (39.6 GB allocated of 44.4 GB). Train + val load took 697 s (alone on
+the node). → Gradient checkpointing is now the default (`--no-grad-checkpoint` to disable); with it
+only each block's input is kept (~0.23 GB per block at batch 32), estimated < 10 GB. Rerun the
+timing job.
+
+## 2026-10-26: shared folder overwritten → own folder `plamen_pipeline`
+
+At 11:48:48 the shared cluster folder `/faststorage/project/aura_thymus/student_pipeline` was
+replaced by another user's pipeline (dimitarnizamov, by mistake, confirmed): different `src/`,
+PLAN/PROGRESS/docs, `configs/` and `data/features/` removed. Survived: `data/cache/` (lungs_u8 +
+rounds_u8 + indexes), `data/cohort.csv` (md5 = local), `data/external/`, `env/.venv{,-dino}`,
+`ext/`, all `runs/` (incl. `runs/dino` checkpoints), `logs/`.
+
+**New folder `/faststorage/project/aura_thymus/plamen_pipeline`** (owner plamenmichev):
+code/configs/docs/figs/PLAN/PROGRESS/small CSVs copied from this local mirror (local code was
+md5-identical to the cluster before the overwrite); symlinks to the large shared items:
+`data/cache`, `data/external`, `env`, `ext`, `runs/{baseline,cosine,cosine_improved_trial,dino,
+dino_probe,thymus_score}` → `student_pipeline/...`. New runs (`runs/finetune/`) and `logs/` are
+real folders here. All submit scripts, `setup_dino_env.sh` and `configs/dino/nlst_2p5mm.yaml`
+now point to `plamen_pipeline`. `s9_dino_features.build_backbone` reads the pretraining config
+files under this project (`local_config`): `launch.json` stores absolute `student_pipeline/`
+paths.
+
+**Recovered:** `data/ssl_scans.csv` rebuilt from `rounds_index.csv` + cohort with S7's QC and
+`ssl_cohort` (no 49 GB re-merge): 34,719 scans / 13,893 pids, every split × round count equal to
+2026-10-19. **Not recovered (not needed now):** `data/features/` (S9 features of trial_2h and
+`stable`); the probe results built from them are intact in `runs/dino_probe/`; S9 regenerates
+them (17–34 min GPU per run) if a probe must be rerun.
+
+S12 CPU smoke from the new folder ✅ (identical numbers to the first smoke, checkpointing on).
+**Next (user):** the timing job again, from `plamen_pipeline`.
+
+## 2026-10-26: D6 `finetune/dino_ep39` result (S12 + S5)
+
+Job 6297655 (L40S): train + val load 2,804 s (BeeGFS contention; 535–710 s on other runs),
+30 epochs × ~12.5 min, 8.16 GB GPU. Val C rises over epochs 1–11, then flat: 0.6905 last
+(selected, `--select last`), best 0.6958 at epoch 19; val loss 7.464 (cosine 7.476, null 7.718);
+train C 0.707 → no overfitting. Median pre-clip grad norm 12–16 with `clip 1.0` the whole run →
+every step clipped (effective lr below the configured one).
+
+S5 on test (155 events; Cox models fitted on val):
+
+| | cosine (CNN) | **finetune/dino_ep39** |
+|---|---|---|
+| η alone | 0.648 [0.604, 0.689] | 0.654 [0.608, 0.696] |
+| clinical | 0.654 | 0.654 |
+| clinical + η | 0.675 | 0.681 [0.642, 0.721] |
+| ΔC (clinical+η − clinical) | +0.021 [−0.017, +0.058], p 0.135 | +0.027 [−0.009, +0.063], p 0.083 |
+| ΔC after 1 y | +0.028 | +0.036 |
+| HR per SD, adjusted sex+cigsmok | — | 1.69 [1.44, 1.99]; high vs low tertile 3.44 |
+
+Reading: the fine-tuned ViT ≈ the CNN (every number slightly better, none significantly; the
+model difference itself was not tested). Fine-tuning > frozen probe (val 0.691 vs 0.658). With
+η in the model, age's HR drops 1.060 → 1.029: η absorbs much of age. Flat AUC 1–5 y and
+C after 1 y ≥ overall → a general lung-risk score, not a detector of visible cancers.
+
+**Goal clarified (user, 2026-10-26):** the model should predict from general lung features and
+must NOT become a nodule/cancer detector, so higher resolution / nodule crops are out. Success =
+added value over clinical (ΔC CI > 0), especially after 1–2 y. Ideas raised, not built: clinical
+covariates inside the training Cox model (image learns only the residual); all-cause death as an
+auxiliary outcome (more events); longer DINO; censoring cancers diagnosed in year 1.
+
+## 2026-10-27: D6 `finetune/scratch` (same ViT, random weights, no layer decay, lr 1e-3)
+
+Job 6297656 done (7 h 17 min). It never learned: train C stayed ~0.52–0.53 (dino_ep39 rose to
+0.71), val C peaked 0.615 at epoch 3, then 0.57–0.59 (last 0.583; dino_ep39 0.690). η sd ~0.03
+(dino_ep39 0.75), so the score is nearly constant. Grad norm spiked to 100–200 in epochs 8–16 (lr
+near its peak). Probably partly too high an lr for a ViT from scratch, but with 724 events a
+random ViT is not expected to work anyway. Conclusion: the DINO weights are what make the ViT
+usable (+0.11 val C); fine-tuning only matches the CNN.
+
+S5 (test): η C 0.571 [0.524, 0.614], below age alone (0.630); C after 1 y 0.568; clinical + η
+0.653 vs clinical 0.654 → ΔC −0.001 [−0.016, +0.013], p 0.548. With clinical in the model η
+flips to HR 0.34 per SD while `lung_ml` grows (1.0002 → 1.0010 per ml): the scratch η is mostly
+a lung-size proxy. Adjusted for sex and smoking only, HR 1.37 per SD, high vs low tertile 1.73. Results
+table in `docs/pipeline.md` §10.

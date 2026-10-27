@@ -21,6 +21,8 @@ SERIES_CSV = ROOT / "nlst.csv"                       # IDC series metadata (Seri
 PROJECT = Path(__file__).resolve().parents[1]
 DATA = PROJECT / "data"
 PRSN_CSV = DATA / "external" / "nlst_780" / "nlst_780" / "nlst_780_prsn_idc_20210527.csv"
+# AIM-Harvard thymic-health percentile per NLST participant (Zenodo 10.5281/zenodo.18306999)
+THYMUS_SCORE_CSV = ROOT / "discovery_pipeline" / "NLST_thymic_health_scores_published.csv"
 CANDIDATES_CSV = DATA / "candidates.csv"             # s1 output
 CACHE_DIR = DATA / "cache"                           # s2 output
 CACHE_NPY = CACHE_DIR / "lungs_u8.npy"               # (N, X, Y, Z) uint8

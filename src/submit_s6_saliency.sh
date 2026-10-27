@@ -6,8 +6,8 @@
 #SBATCH --mem       48g
 #SBATCH --time      02:00:00
 #SBATCH --job-name  s6_saliency
-#SBATCH --output    /faststorage/project/aura_thymus/student_pipeline/logs/s6_%x_%j.out
-#SBATCH --error     /faststorage/project/aura_thymus/student_pipeline/logs/s6_%x_%j.err
+#SBATCH --output    /faststorage/project/aura_thymus/plamen_pipeline/logs/s6_%x_%j.out
+#SBATCH --error     /faststorage/project/aura_thymus/plamen_pipeline/logs/s6_%x_%j.err
 
 # S6 -- saliency maps (occlusion + Grad-CAM) of one trained run on val patients.
 # All arguments are passed to s6_saliency.py:
@@ -18,7 +18,7 @@
 # (Only the val volumes, ~6 GB, are held in host RAM.)
 
 set -euo pipefail
-PROJECT=/faststorage/project/aura_thymus/student_pipeline
+PROJECT=/faststorage/project/aura_thymus/plamen_pipeline
 mkdir -p "$PROJECT/logs"
 source "$PROJECT/env/.venv/bin/activate"
 python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else '')"

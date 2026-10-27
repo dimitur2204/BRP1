@@ -46,11 +46,21 @@ RUNS = PROJECT / "runs" / "dino"
 TEACHER = "model.teacher_backbone."
 
 
+def local_config(f: str) -> str:
+    """launch.json stores absolute config paths of the folder the run was launched from
+    (student_pipeline until 2026-10-26); read the same file under this PROJECT instead."""
+    parts = Path(f).parts
+    for anchor in ("ext", "configs"):
+        if anchor in parts:
+            return str(PROJECT.joinpath(*parts[parts.index(anchor):]))
+    return f
+
+
 def build_backbone(run: str):
     from monai.bundle import ConfigParser
     launch = json.loads((RUNS / run / "launch.json").read_text())
     parser = ConfigParser()
-    parser.read_config(launch["config_files"])
+    parser.read_config([local_config(f) for f in launch["config_files"]])
     parser.update(launch["overrides"])      # before parse(), as in s8
     parser.parse()
     return parser.get_parsed_content("lightning_module#backbone")
