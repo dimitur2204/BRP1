@@ -179,4 +179,4 @@ only the risk they do not explain (goal: general lung features with ΔC over cli
   2.5 mm `lungs_u8.npy` cache (as every run so far, not the new 1.4 mm cache). CPU smoke: PROGRESS.
 - **C2 runs** ⬜ **user:** `runs/clinical_cox/offset` and `runs/clinical_cox/joint` (commands in
   §11), then S5 on both. Compare test ΔC with `cosine` (+0.021) and `finetune/dino_ep39` (+0.027).
-- ⬜ Same idea for the DINO ViT fine-tune (S12), if C2 helps.
+- CNN only (user, 2026-10-27): not applied to the S12 ViT fine-tune.
