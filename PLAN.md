@@ -177,6 +177,8 @@ only the risk they do not explain (goal: general lung features with ΔC over cli
 - **C1 code** ✅ (2026-10-27) `s4_train.py --clinical age,sex,cigsmok,lung_ml,lung_mean_hu
   --clinical-mode {offset,joint}` (`model.ClinicalCox`), otherwise the `cosine` recipe. Input: the
   2.5 mm `lungs_u8.npy` cache (as every run so far, not the new 1.4 mm cache). CPU smoke: PROGRESS.
-- **C2 runs** ⬜ **user:** `runs/clinical_cox/offset` and `runs/clinical_cox/joint` (commands in
-  §11), then S5 on both. Compare test ΔC with `cosine` (+0.021) and `finetune/dino_ep39` (+0.027).
+- **C2 runs** ✅ (2026-10-28, jobs 6581674 / 6581644) + S5. Test ΔC over clinical: offset +0.023
+  [−0.012, +0.055]; **joint +0.035 [−0.002, +0.075], p 0.033** (best so far; `cosine` +0.021,
+  `dino_ep39` +0.027). η no longer tracks smoking/lung size/density. One seed each (PROGRESS).
+- ⬜ Possible next: joint seeds 1–2 to see whether +0.035 holds.
 - CNN only (user, 2026-10-27): not applied to the S12 ViT fine-tune.

@@ -541,3 +541,15 @@ env/.venv/bin/python src/s5_evaluate.py --run clinical_cox/offset     # and clin
 ```
 
 Success: test ΔC above `cosine`'s +0.021 [−0.017, +0.058], ideally with a CI > 0, and C after 1 y.
+
+**Results (2026-10-28, test, 155 events; S5 Cox models fitted on val).** ΔC = clinical + η − clinical:
+
+| run | val C total / image part | test η alone | test clinical + η | ΔC [95% CI], p_boot |
+|---|---|---|---|---|
+| `cosine` (reference) | 0.688 | 0.648 | 0.675 | +0.021 [−0.017, +0.058], 0.135 |
+| `clinical_cox/offset` | 0.699 / 0.668 | 0.612 | 0.677 | +0.023 [−0.012, +0.055], 0.093 |
+| `clinical_cox/joint` | 0.712 / 0.682 | 0.625 | 0.689 | +0.035 [−0.002, +0.075], 0.033 |
+
+η's Spearman ρ with cigsmok / lung_ml / lung_mean_hu falls from 0.18 / 0.18 / −0.17 (`cosine`)
+to ≤ 0.10 in absolute value; with age from 0.23 to 0.16–0.19. One seed per run.
+

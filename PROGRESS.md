@@ -742,3 +742,40 @@ the `ssl-dino` S4 (code path without `--clinical` is unchanged by reading).
 
 **Next (user):** copy the code to `plamen_pipeline`, then `clinical_cox/offset` and
 `clinical_cox/joint` (§11), then S5 on both.
+
+## 2026-10-28: `clinical_cox/offset` and `clinical_cox/joint` results (S4 + S5)
+
+Jobs 6581674 (offset, 2 h 20 min incl. 784 s load) and 6581644 (joint, 1 h 44 min, 337 s load);
+the first offset job 6581643 failed because the cluster still had the old `s4_train.py`
+(the copy had not arrived). ~64 s/epoch on an L40S.
+
+**Training.** Clinical-only Cox on train (per SD): age 0.469, male −0.231, cigsmok 0.217, lung_ml
+0.364, lung_mean_hu 0.118; clinical-only val C 0.636. The image part stays near 0 for ~20 epochs
+(val SD < 0.05), then grows to ~0.45. Val C (total) rises to the end: offset best 0.699 (ep 72),
+joint 0.712 (ep 68). Image part alone, val C: offset 0.668, joint 0.682 (`cosine` 0.688). Train C
+0.70–0.72 → no overfitting. Joint β moved little (age 0.469 → 0.420, lung_mean_hu 0.118 → 0.089).
+
+**S5, test (155 events; Cox models fitted on val):**
+
+| | cosine | dino_ep39 | **offset** | **joint** |
+|---|---|---|---|---|
+| η alone | 0.648 | 0.654 | 0.612 [0.570, 0.654] | 0.625 [0.582, 0.668] |
+| clinical | 0.654 | 0.654 | 0.654 | 0.654 |
+| clinical + η | 0.675 | 0.681 | 0.677 [0.638, 0.717] | **0.689** [0.651, 0.726] |
+| ΔC | +0.021 [−0.017, +0.058], p 0.135 | +0.027 [−0.009, +0.063], p 0.083 | +0.023 [−0.012, +0.055], p 0.093 | **+0.035 [−0.002, +0.075], p 0.033** |
+| ΔC after 1 y | +0.028 | +0.036 | +0.023 | +0.034 |
+| ΔAUC 1/2/3/5 y | −0.014 to +0.011 | | +0.022/+0.016/+0.007/+0.009 | +0.037/+0.041/+0.019/+0.021 |
+| HR/SD (val fit, + clinical) | | | 1.70 [1.50, 1.93] | 1.82 [1.58, 2.10] |
+| HR/SD test, adj. sex + smoking | | 1.69 | 1.46 [1.28, 1.66] | 1.50 [1.30, 1.74] |
+
+Spearman ρ of η (val) with age / male / cigsmok / lung_ml / lung_mean_hu: cosine 0.23 / −0.05 /
+0.18 / 0.18 / −0.17; offset 0.19 / −0.14 / 0.03 / −0.10 / −0.06; joint 0.16 / −0.03 / 0.03 /
+−0.10 / 0.05. As intended, η no longer tracks smoking, lung size or density; some age signal
+remains (age HR in the val Cox still drops 1.060 → 1.03 with η).
+
+**Reading.** Joint gives the largest added value so far (ΔC +0.035, AUC gains at every horizon,
+bootstrap p 0.033), with the CI lower bound just below 0 (−0.002). Offset ≈ `cosine`. η alone is
+weaker on test than on val (0.61–0.62 vs 0.67–0.68; `cosine` 0.648 vs 0.688): the image part is
+a residual score, worth reading only together with clinical. Caveats: one seed per variant; the
+best-val-C epoch was selected (as `cosine`); differences between models were not tested (paired
+CIs overlap widely).
