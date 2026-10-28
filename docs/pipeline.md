@@ -551,5 +551,8 @@ Success: test ΔC above `cosine`'s +0.021 [−0.017, +0.058], ideally with a CI 
 | `clinical_cox/joint` | 0.712 / 0.682 | 0.625 | 0.689 | +0.035 [−0.002, +0.075], 0.033 |
 
 η's Spearman ρ with cigsmok / lung_ml / lung_mean_hu falls from 0.18 / 0.18 / −0.17 (`cosine`)
-to ≤ 0.10 in absolute value; with age from 0.23 to 0.16–0.19. One seed per run.
+to ≤ 0.10 in absolute value; with age from 0.23 to 0.16–0.19.
 
+Joint seeds (2026-10-28): ΔC s0 +0.035, s1 +0.026 [−0.012, +0.061], s2 +0.049 [+0.013, +0.090].
+Ensemble of the three (mean of val-z-scored η, `runs/clinical_cox/joint_ens3`, S5 `--added-only`):
+test clinical + η 0.697, **ΔC +0.043 [+0.007, +0.084]**, p_boot 0.014; ΔC after 1 y +0.034.

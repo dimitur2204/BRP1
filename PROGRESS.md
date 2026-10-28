@@ -779,3 +779,31 @@ weaker on test than on val (0.61–0.62 vs 0.67–0.68; `cosine` 0.648 vs 0.688)
 a residual score, worth reading only together with clinical. Caveats: one seed per variant; the
 best-val-C epoch was selected (as `cosine`); differences between models were not tested (paired
 CIs overlap widely).
+
+## 2026-10-28: joint seeds 1–2 + 3-seed ensemble
+
+Jobs 6667200/1 (`clinical_cox/joint_s1`, `joint_s2`), 5 h 05 min each instead of ~1.7 h: they started
+together on gn-1002 (load 1,587 s each) and epochs 1–24 took 7–18 min (normal ~64 s). Normal speed
+from epoch 25, at the same time (18:15) that dimitarnizamov's `s4_train` (6659734, 160 GB RAM,
+probably the 1.4 mm cache) on that node was cancelled → contention for host memory/IO on the node
+(inferred from timing). GPU memory unchanged (6.87 GB).
+
+Best epoch 74 in both. Val C total / image part: s1 0.697 / 0.658, s2 0.736 / 0.709 (s0 0.712 /
+0.679). η's ρ with cigsmok / lung_ml / lung_mean_hu ≤ 0.11 in every seed, with age 0.16–0.19.
+Val η correlation between seeds: s0–s1 0.88, s0–s2 0.69, s1–s2 0.71.
+
+**S5 added value, test (155 events):**
+
+| | η alone | clinical + η | ΔC [95% CI] | p_boot | ΔC after 1 y | ΔAUC 1/2/3/5 y |
+|---|---|---|---|---|---|---|
+| joint s0 | 0.625 | 0.689 | +0.035 [−0.002, +0.075] | 0.033 | +0.034 | +0.037/+0.041/+0.019/+0.021 |
+| joint s1 | 0.602 | 0.679 | +0.026 [−0.012, +0.061] | 0.085 | +0.026 | +0.023/+0.027/+0.013/+0.016 |
+| joint s2 | 0.667 | 0.703 | +0.049 [+0.013, +0.090] | 0.007 | +0.031 | +0.103/+0.050/+0.043/+0.047 |
+| mean of seeds | | | +0.037 | | +0.030 | |
+| **ensemble** (`joint_ens3`) | 0.646 | 0.697 | **+0.043 [+0.007, +0.084]** | 0.014 | +0.034 | +0.073/+0.052/+0.033/+0.034 |
+
+Ensemble = mean of the three seeds' η, each z-scored on val; `runs/clinical_cox/joint_ens3/pred.csv`
+(no model; S5 `--added-only`). Decided after seeing the seeds, but uses all of them (no seed
+picked). Reading: across seeds, joint adds ~+0.03–0.05 C over clinical; the ensemble is the
+first result with a ΔC CI above 0. Part of the gain is early (largest at 1 y), but ΔC among patients
+event-free at 1 y is still +0.03 in every seed, so it is not only prevalent cancers.

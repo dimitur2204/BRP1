@@ -180,5 +180,7 @@ only the risk they do not explain (goal: general lung features with ΔC over cli
 - **C2 runs** ✅ (2026-10-28, jobs 6581674 / 6581644) + S5. Test ΔC over clinical: offset +0.023
   [−0.012, +0.055]; **joint +0.035 [−0.002, +0.075], p 0.033** (best so far; `cosine` +0.021,
   `dino_ep39` +0.027). η no longer tracks smoking/lung size/density. One seed each (PROGRESS).
-- ⬜ Possible next: joint seeds 1–2 to see whether +0.035 holds.
+- **C3 joint seeds 1–2** ✅ (jobs 6667200/1): ΔC s1 +0.026, s2 +0.049 (mean of seeds +0.037).
+  **3-seed ensemble ΔC +0.043 [+0.007, +0.084]**, first CI > 0 (ensemble chosen post hoc, all
+  seeds used). ⬜ user decision: next step (e.g. offset seeds, censor year-1 cancers, ensemble as default).
 - CNN only (user, 2026-10-27): not applied to the S12 ViT fine-tune.
