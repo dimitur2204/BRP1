@@ -890,3 +890,23 @@ nodule read. η tracks reported emphysema (ρ 0.23–0.28), a general lung featu
 n = 23). > 20 mm masses are 38% ≤ 1 y cancers, which fits its test ΔAUC 1 y +0.103. Caveats: val chose
 the epoch (best val C), so val numbers are optimistic, most for s2 (val C 0.736); on train s2's ΔC over
 clinical + T0 (+0.035) ≈ offset (+0.037). Test not touched.
+
+**S6 on `clinical_cox/joint` (s0; job 7122345, 27.5 min, 423 val patients = 155 events + 155 controls +
+all with a T0 nodule ≥ 10 mm).** η check 2.9e-5; orientation left 1.0 / up 0.988. `joint_s2` S6 was not yet
+resubmitted (only the failed 7122344 exists).
+- **Where it looks: no longer the posterior bases.** Median occlusion enrichment LUL 0.60, LLL 0.70, RUL 1.28,
+  RML 0.63, RLL 1.08 (`cosine`: 0.10 / 1.55 / 0.12 / 0.19 / 2.34). Mean maps: mostly the lateral right lung
+  (upper and lower), events ≈ controls. The clinical covariates moved the image away from lung size/bases.
+- **Cancer lobe (prsn):** dx ≤ 1 y (n 33): enrichment 1.62 vs 1.02 same lobe in controls (p 0.004), top-lobe
+  hit 0.58 vs chance 0.21. dx > 1 y (n 108): 0.97 vs 1.02 (p 0.50), hit 0.25. (`cosine`: no localisation
+  at all.) Grad-CAM: no localisation (hit 0.17–0.22).
+- **T0 nodule ≥ 10 mm lobe (ctab):** events (n 47) 1.40 vs 1.08 without a nodule (p 0.008), hit 0.40;
+  **controls with benign nodules (n 116) 1.08, p 0.20, hit 0.22 = chance.**
+- Figures (largest T0 masses, 37–76 mm): occlusion peaks on the mass in most events AND in the 76 mm benign
+  mass of control 200508, but η of these patients is moderate (events −0.31 to 0.79, controls −1.72 to 0.43).
+  **Mask caveat:** TotalSegmentator often cuts large solid masses out of the lung mask (102806, 204909: the
+  tumour is a hole in the input), so the network sees a mask defect, not the tumour density.
+- **Reading.** Combined with S13: the score is mostly a general lung signal (high C in nodule-free patients,
+  benign nodules ignored), plus a local sensitivity to visible early cancers in their lobe (the 33 dx ≤ 1 y).
+  That part is detection-like and is what the T0 read already covers; S13's ΔC over clinical + T0 read
+  (+0.043 for s0) is the part beyond it.

@@ -196,6 +196,7 @@ does not overfit. Why, and did it learn the nodules?
 - **A1 `s13_t0_findings.py`** ✅ run (2026-11-02, login node). **Not nodule detectors:** C in nodule-free
   patients ≥ overall; benign-nodule controls score ~0; val CV ΔC over clinical + T0 read +0.04–0.055 (CI > 0)
   in every run. s2: better in nodule-free patients too (0.717) + only run that reacts to masses > 2 cm.
-- **A2 S6 on joint runs** code ✅. `joint` running (job 7122345). `joint_s2` job 7122344 failed (old
-  code on cluster) → ⬜ **user: resubmit.**
+- **A2 S6 on joint runs** ✅ `joint` (s0): looks at the lateral right lung (not the bases); localises the lobe of
+  cancers diagnosed ≤ 1 y (hit 0.58 vs 0.21, p 0.004) but not later cancers nor benign nodules (hit 0.22).
+  ⬜ **user: resubmit `joint_s2`** (job 7122344 ran old code).
 - ⬜ S5 with clinical + T0 read as the reference (test), all runs: the new bar for "added value".
