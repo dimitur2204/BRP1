@@ -30,6 +30,7 @@ it is reused: no cohort, no split, no cache, no code.
 | S10 Cox probe | `src/s10_dino_probe.py` (`--summary`) | login node, minutes | `runs/dino_probe/{run}/{ckpt}_{use}/` (S4 format → S5) |
 | S11 thymus score | `src/s11_thymus_score.py` | login node, ~1 min | `runs/thymus_score/` |
 | S12 ViT fine-tune (D6) | `src/s12_dino_finetune.py` via `submit_s12_dino_finetune.sh` (1 GPU, ~4 h on an L40S) | Slurm | `runs/finetune/{name}/` (S4 format → S5) |
+| S14 rounds cohort | `src/s14_rounds_cohort.py` | login node, seconds | `data/rounds_cohort.csv` (→ `s4_train.py --train-scans`) |
 
 Cluster folder (since 2026-10-26): `/faststorage/project/aura_thymus/plamen_pipeline`. The large
 shared items (`data/cache`, `data/external`, `env`, `ext`, the runs up to 2026-10-20) are symlinks
@@ -587,4 +588,37 @@ Real data (val): T0 max nodule diameter alone C 0.684; CV C clinical 0.63 → cl
 env/.venv/bin/python src/s13_t0_findings.py                    # login node, writes data/t0_findings.csv first
 sbatch src/submit_s6_saliency.sh --run clinical_cox/joint_s2
 sbatch --begin=now+20minutes src/submit_s6_saliency.sh --run clinical_cox/joint
+```
+
+## 13. Training on every screening round (`src/s14_rounds_cohort.py` + `s4_train.py --train-scans`, branch `joint-multiround`)
+
+Why: from 2026-11-02 the joint model (§11) is the model to build on. It trains on one scan per
+patient (yr0, 11,442 train patients, 724 events). NLST screened at T0, T1 and T2, and S7 already
+preprocessed the yr1/yr2 scans of every train + val patient with the unchanged S2 input definition
+(own TotalSegmentator lung mask, same 2.5 mm grid, window, encoding and S3 image QC). Question: do
+~2.5× more labelled lung images improve the joint CNN?
+
+| choice | value | why |
+|---|---|---|
+| scans | yr0 (`cohort.csv`) + yr1/yr2 from `data/ssl_scans.csv` (S7, QC passed); train + val patients only, test never (asserted) | the cache exists; test yr1/yr2 were never preprocessed, keeping test untouched |
+| time origin | each scan: time = (candx_days or canc_free_days) − scr_days{r}; missing scr_days{r} → scr_days0 + 365 r (`days_imputed`) | the label must describe the future of the lungs in that image |
+| event | the patient's lung cancer, for every round; cancers diagnosed soon after the scan are **kept** (user, 2026-11-02) | same event definition as yr0, where ≤ 1 y cancers are also kept |
+| dropped | scans with time ≤ 0 (at/after diagnosis or end of follow-up) | a scan after the diagnosis is not a prediction |
+| covariates | age at that scan (cohort age + (scr_days{r} − scr_days0)/365.25); `lung_ml`, `lung_mean_hu` of that scan's mask; sex, race, cigsmok baseline | the clinical part of η_total must describe the same scan as the image part |
+| weighting | **one random scan per patient per epoch** (user, 2026-11-02: patients weigh the same) | every patient counts once per epoch whatever their number of scans; a patient is never twice in one Cox risk set; epochs, lr schedule and runtime equal the yr0 recipe, so the only change is the data |
+| clinical standardisation, β start | yr0 train rows (as §11) | the same clinical reference as the yr0 runs |
+| val, test, train C, `pred.csv` | yr0 only (`cohort.csv`) | S5 runs unchanged, and ΔC compares directly with `clinical_cox/joint{,_s1,_s2}` and `joint_ens3` |
+| memory | all train scans in host RAM (~68 GB): `sbatch --mem 160g` | random per-epoch draws from BeeGFS would be slow |
+
+Caveat: within a patient, the yr0, yr1 and yr2 images are highly correlated, and the yr1/yr2
+labels are the yr0 label with a shorter time. The gain is therefore expected to be well below
+"2.5× data"; it mainly adds augmentation-like variation (another scanner session, inflation, dose)
+and more images close to the diagnosis.
+
+```bash
+env/.venv/bin/python src/s14_rounds_cohort.py                  # login node, seconds
+sbatch --mem 160g src/submit_s4_train.sh --run-name rounds/joint_s0 --seed 0 \
+    --clinical age,sex,cigsmok,lung_ml,lung_mean_hu --clinical-mode joint --train-scans ../data/rounds_cohort.csv
+# s1, s2: same with --seed 1/2 and --begin=now+30minutes / +60minutes (staggered loads)
+env/.venv/bin/python src/s5_evaluate.py --run rounds/joint_s0
 ```

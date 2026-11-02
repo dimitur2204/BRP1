@@ -201,3 +201,21 @@ does not overfit. Why, and did it learn the nodules?
   ✅ `joint_s2` (job 7168208): same mechanism, stronger response to visible cancers/large masses (nodule-lobe hit in
   events 0.49 vs 0.40; controls 0.30 vs 0.22). Large tumours reach the input as mask holes (`hole_cases/`).
 - ⬜ S5 with clinical + T0 read as the reference (test), all runs: the new bar for "added value".
+
+# Next: train the joint CNN on every screening round (branch `joint-multiround`)
+
+Worktree `.claude/worktrees/joint-multiround` (from `joint-s2-analysis` 4b6c766), 2026-11-02. Design:
+`docs/pipeline.md` §13. **The joint model (`--clinical-mode joint`) is the model from now on** (user).
+Question: does adding the T1/T2 scans (yr1/yr2, ~2.5× the images) improve it?
+
+Decisions (user, 2026-11-02): cancers diagnosed soon after a scan are kept (not censored); patients
+weigh the same whatever their number of scans; input = the segmented lungs as before (S7 = unchanged S2).
+
+- **R1 code** ✅ (2026-11-02) `src/s14_rounds_cohort.py` → `data/rounds_cohort.csv` (time from each scan,
+  age/lung_ml/lung_mean_hu of that scan, scans at/after diagnosis dropped); `s4_train.py --train-scans`
+  (one random scan per patient per epoch; val/test/pred.csv yr0). Synthetic test ✅ (PROGRESS);
+  GPU/CPU smoke on the cluster ⬜.
+- **R2 S14 run** ⬜ login node.
+- **R3 runs** ⬜ `rounds/joint_s0–s2` (`sbatch --mem 160g`, staggered), then S5 + 3-seed ensemble.
+  Compare ΔC over clinical with `joint` s0/s1/s2 (+0.035/+0.026/+0.049) and `joint_ens3` (+0.043 [+0.007, +0.084]).
+

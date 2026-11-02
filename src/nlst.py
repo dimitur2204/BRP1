@@ -78,3 +78,6 @@ SSL_SPLITS = ("train", "val")
 SSL_CACHE_NPY = CACHE_DIR / "rounds_u8.npy"          # s7 output: yr1/yr2 volumes, same encoding
 SSL_CACHE_INDEX = CACHE_DIR / "rounds_index.csv"     # row -> scan + QC
 SSL_SCANS_CSV = DATA / "ssl_scans.csv"               # s7 output: the pretraining scan list
+
+# ── labelled training scans from every round (s14, branch joint-multiround) ──
+ROUNDS_COHORT_CSV = DATA / "rounds_cohort.csv"       # s14 output: train + val scans, time from each scan

@@ -14,6 +14,9 @@
 #   sbatch src/submit_s4_train.sh --run-name cosine_s1 --seed 1
 #   sbatch src/submit_s4_train.sh --run-name clinical_cox/offset --clinical age,sex,cigsmok,lung_ml,lung_mean_hu
 #   (clinical covariates in the Cox loss, docs/pipeline.md section 11; add --clinical-mode joint for clinical_cox/joint)
+#   sbatch --mem 160g src/submit_s4_train.sh --run-name rounds/joint_s0 --clinical age,sex,cigsmok,lung_ml,lung_mean_hu \
+#       --clinical-mode joint --train-scans ../data/rounds_cohort.csv
+#   (every screening round, docs/pipeline.md section 13: ~68 GB of volumes in RAM, hence --mem 160g)
 # Then: env/.venv/bin/python src/s5_evaluate.py --run cosine
 # A finished run directory is never overwritten (new --run-name or --overwrite).
 # Runs under 2 h (e.g. --epochs 40, ~50 min) can go to the gpu-short partition (8 L40S,

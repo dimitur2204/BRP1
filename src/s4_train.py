@@ -33,6 +33,14 @@ Recipe (all defaults; every one is a CLI flag):
              (default) keeps it fixed, so the CNN learns only the risk the
              covariates do not explain; joint trains it with the CNN (no
              weight decay). Selection and val/train C then use the total eta
+  rounds     --train-scans data/rounds_cohort.csv (S14; default off = yr0 only):
+             train on the yr0/yr1/yr2 scans of the train patients, time measured
+             from each scan. Each epoch draws ONE random scan per patient, so
+             every patient weighs the same, a patient is never twice in a risk
+             set, and epochs/schedule/runtime equal the yr0-only recipe. All
+             train scans are held in host RAM (~68 GB: sbatch --mem 160g).
+             Val, test, train C and pred.csv stay yr0 (cohort.csv); the clinical
+             mean/SD and beta start are still fitted on the yr0 train rows
 No hyper-parameter search: this is the baseline to build on.
 The first run (runs/baseline, 2026-10-05) used the old defaults:
   --schedule constant --lr 3e-4 --epochs 60 --patience 12
@@ -59,6 +67,8 @@ Usage:
     sbatch src/submit_s4_train.sh --run-name cosine_s1 --seed 1
     sbatch src/submit_s4_train.sh --run-name ema_epb4 --ema 0.999 --select last --events-per-batch 4
     sbatch src/submit_s4_train.sh --run-name clinical_cox/offset --clinical age,sex,cigsmok,lung_ml,lung_mean_hu
+    sbatch --mem 160g src/submit_s4_train.sh --run-name rounds/joint_s0 --clinical age,sex,cigsmok,lung_ml,lung_mean_hu \
+        --clinical-mode joint --train-scans ../data/rounds_cohort.csv
 An existing run directory with a model.pt is never overwritten (pick a new
 --run-name, or pass --overwrite).
     env/.venv/bin/python src/s4_train.py --smoke --device cpu \\
@@ -79,7 +89,7 @@ import pandas as pd
 import torch
 
 from model import ClinicalCox, LungCNN, augment, cox_loss, harrell_c, to_input
-from nlst import CACHE_NPY, COHORT_CSV, GRID, RUNS_DIR
+from nlst import CACHE_NPY, COHORT_CSV, GRID, RUNS_DIR, SSL_CACHE_NPY
 from s5_evaluate import covariates
 
 
@@ -107,6 +117,9 @@ def parse_args() -> argparse.Namespace:
                     help="comma-separated cohort.csv covariates added to eta in the Cox loss; empty = off")
     ap.add_argument("--clinical-mode", choices=["offset", "joint"], default="offset",
                     help="offset: beta fixed at the train Cox fit; joint: beta trained with the CNN")
+    ap.add_argument("--train-scans", default="",
+                    help="S14 rounds_cohort.csv: train on every round, one random scan per patient per epoch")
+    ap.add_argument("--rounds-cache", default=str(SSL_CACHE_NPY), help="yr1/yr2 volumes (S7)")
     ap.add_argument("--no-aug", action="store_true")
     ap.add_argument("--n-train-eval", type=int, default=2000,
                     help="train patients scored in eval mode each epoch (train C)")
@@ -141,6 +154,30 @@ def clinical_design(tr: pd.DataFrame, others: list, cols: list) -> tuple:
     info = {"columns": list(X.columns), "mean": mu.tolist(), "sd": sd.tolist(),
             "beta_start": cph.params_[X.columns].tolist()}
     return z, info
+
+
+def one_scan_per_patient(rng, patient: np.ndarray) -> np.ndarray:
+    """Index of one uniformly drawn scan per patient (patient = integer code per scan)."""
+    perm = rng.permutation(len(patient))
+    _, first = np.unique(patient[perm], return_index=True)
+    return perm[first]
+
+
+def load_train_scans(path: str, tr: pd.DataFrame, cache, rounds_cache: str) -> tuple:
+    """(scans frame, uint8 volumes, positions of tr's yr0 rows in it) for --train-scans."""
+    trs = pd.read_csv(path, dtype={"pid": str}).query("split == 'train'")
+    if set(trs["pid"]) != set(tr["pid"]):
+        raise SystemExit(f"{path} train patients != cohort train patients -- rerun s14")
+    trs = trs.sort_values(["cache", "row"]).reset_index(drop=True)  # sequential reads per cache
+    x = np.empty((len(trs), *cache.shape[1:]), dtype=np.uint8)
+    for name, src in (("yr0", cache), ("rounds", np.load(rounds_cache, mmap_mode="r"))):
+        pos = np.flatnonzero(trs["cache"].to_numpy() == name)
+        rows = trs["row"].to_numpy()[pos]
+        for i in range(0, len(pos), 512):  # chunks: no second full copy in RAM
+            x[pos[i:i + 512]] = src[rows[i:i + 512]]
+    tr_pos = np.flatnonzero(trs["round"].to_numpy() == "yr0")  # sorted by row, as tr
+    assert trs["pid"].to_numpy()[tr_pos].tolist() == tr["pid"].tolist()
+    return trs, x, tr_pos
 
 
 def lr_at(step: int, total: int, warmup: int, peak: float, schedule: str, floor: float = 0.0) -> float:
@@ -245,20 +282,26 @@ def main() -> None:
     te = cohort[cohort.split == "test"].sort_values("row")
 
     t0 = time.time()
-    x_tr = np.asarray(cache[np.sort(tr["row"].to_numpy())])  # sorted rows = sequential read
     tr = tr.sort_values("row")
+    if a.train_scans:  # every round; x_tr/t_tr/e_tr/z_tr are per scan, tr_pos = the yr0 rows
+        trs, x_tr, tr_pos = load_train_scans(a.train_scans, tr, cache, a.rounds_cache)
+        patient = pd.factorize(trs["pid"])[0]
+        print("train scans by round: " + trs["round"].value_counts().sort_index().to_json(), flush=True)
+    else:
+        trs, tr_pos = tr, np.arange(len(tr))
+        x_tr = np.asarray(cache[tr["row"].to_numpy()])  # sorted rows = sequential read
     x_va = np.asarray(cache[np.sort(va["row"].to_numpy())])
     va = va.sort_values("row")
     print(f"loaded train {x_tr.shape} + val {x_va.shape} in {time.time() - t0:.0f}s", flush=True)
-    t_tr = tr["time"].to_numpy(np.float32); e_tr = tr["event"].to_numpy(np.float32)
+    t_tr = trs["time"].to_numpy(np.float32); e_tr = trs["event"].to_numpy(np.float32)
     t_va = va["time"].to_numpy(np.float32); e_va = va["event"].to_numpy(np.float32)
-    sub = np.sort(rng.choice(len(tr), size=min(a.n_train_eval, len(tr)), replace=False))
+    sub = tr_pos[np.sort(rng.choice(len(tr), size=min(a.n_train_eval, len(tr)), replace=False))]
 
     clin = bool(a.clinical)
     z_tr = z_va = z_te = None
     model = LungCNN(dropout=a.dropout)
     if clin:
-        (z_tr, z_va, z_te), clin_info = clinical_design(tr, [va, te], a.clinical)
+        (_, z_va, z_te, z_tr), clin_info = clinical_design(tr, [va, te, trs], a.clinical)
         model = ClinicalCox(model, clin_info["beta_start"], train_beta=a.clinical_mode == "joint")
         lp_va = z_va @ np.asarray(clin_info["beta_start"], np.float32)
         clin_info.update({"val_c": harrell_c(lp_va, t_va, e_va), "val_loss": val_cox(lp_va, t_va, e_va)})
@@ -287,7 +330,8 @@ def main() -> None:
     warmup_steps = int(round(a.warmup_epochs * steps_per_epoch))
     step = 0
     cfg = {**vars(a), "n_params": n_params,
-           "n_train": len(tr), "events_train": int(e_tr.sum()),
+           "n_train": len(tr), "events_train": int(tr["event"].sum()),
+           "n_train_scans": len(trs), "events_train_scans": int(e_tr.sum()),
            "n_val": len(va), "events_val": int(e_va.sum())}
     (out / "config.json").write_text(json.dumps(cfg, indent=2))
     print(json.dumps(cfg, indent=2), flush=True)
@@ -299,7 +343,9 @@ def main() -> None:
         if device.type == "cuda":
             torch.cuda.reset_peak_memory_stats(device)
         losses, skipped = [], 0
-        for b in epoch_batches(rng, e_tr, a.batch_size, a.events_per_batch):
+        pick = one_scan_per_patient(rng, patient) if a.train_scans else np.arange(len(e_tr))
+        for b in epoch_batches(rng, e_tr[pick], a.batch_size, a.events_per_batch):
+            b = np.sort(pick[b])
             lr = lr_at(step, total_steps, warmup_steps, a.lr, a.schedule, a.min_lr)
             step += 1  # skipped batches advance the schedule too, so it ends on time
             if e_tr[b].sum() == 0:
@@ -366,8 +412,9 @@ def main() -> None:
     torch.save({"state_dict": best_state, "epoch": sel_epoch, "val_c": sel_c, "config": cfg},
                out / "model.pt")
     rows = []
-    for df, x, z in ((tr, x_tr, z_tr), (va, x_va, z_va), (te, cache[te["row"].to_numpy()], z_te)):
-        eta, e_img = score(model, x, z)
+    for df, x, z, idx in ((tr, x_tr, z_tr, tr_pos), (va, x_va, z_va, None),
+                          (te, cache[te["row"].to_numpy()], z_te, None)):
+        eta, e_img = score(model, x, z, idx)
         d = df[["pid", "split", "time", "event"]].assign(eta=e_img)  # eta = image part (s5)
         rows.append(d.assign(eta_clin=eta - e_img, eta_total=eta) if clin else d)
     pd.concat(rows).sort_values("pid").to_csv(out / "pred.csv", index=False)

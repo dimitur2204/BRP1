@@ -932,3 +932,23 @@ a hole/dent in the lung mask plus the 5 mm dilated rim, not as tumour tissue.
   cancers > 1 y), plus a somewhat stronger local response to visible cancers and large masses. This matches S13
   (s2 alone reacts to > 20 mm masses; it is also best in nodule-free patients). Part of s2's early (1 y) gain is
   therefore detection of visible masses, partly through mask holes; the general part is shared by all runs.
+
+## 2026-11-02: joint CNN on every screening round (branch `joint-multiround`)
+
+User: the joint model is the model from now on; try adding the T1/T2 scans. Decisions: keep cancers
+diagnosed soon after a scan (no censoring), weigh patients the same, same segmented-lung input.
+
+- Pushed `cnn3d-lungs-cox` (cd6940c) and `joint-s2-analysis` (new on origin); worktree
+  `.claude/worktrees/joint-multiround` from `joint-s2-analysis`.
+- Existing data: S7 (job 5098861) already holds yr1/yr2 of all train + val patients through the unchanged
+  S2 preprocessing with each round's own TotalSegmentator mask: `data/ssl_scans.csv` 34,719 scans
+  (train 11,442 / 8,634 / 8,563 yr0/yr1/yr2). No new preprocessing needed. prsn has `scr_days1/2`
+  (missing for 4,640 / 5,996 of 53,452 participants overall, mostly not screened).
+- `src/s14_rounds_cohort.py` (design: pipeline.md §13) and `s4_train.py --train-scans` / `--rounds-cache`.
+  The default path is unchanged (same RNG use, so earlier runs reproduce).
+- Synthetic test (local, numpy/pandas only; S4 helpers extracted without torch): times from each scan
+  (event 35 d after a T1 scan kept; T2 after diagnosis dropped), missing scan date imputed + flagged,
+  age at scan, per-scan lung_ml, volumes read from the right cache/row, yr0 positions match `tr`, one
+  scan per patient per epoch with uniform frequencies (0.33/0.33/0.33 for 3 scans, 0.5/0.5 for 2).
+  Not yet run with torch (no local torch) → CPU smoke on the cluster before the GPU runs.
+
