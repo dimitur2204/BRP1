@@ -215,7 +215,9 @@ weigh the same whatever their number of scans; input = the segmented lungs as be
   age/lung_ml/lung_mean_hu of that scan, scans at/after diagnosis dropped); `s4_train.py --train-scans`
   (one random scan per patient per epoch; val/test/pred.csv yr0). Synthetic test ✅ (PROGRESS);
   GPU/CPU smoke on the cluster ⬜.
-- **R2 S14 run** ⬜ login node.
+- **R2 S14 run** ✅ (2026-11-02, cluster worktree): 34,619 scans of 13,893 pts; train 11,442 / 8,600 / 8,516
+  scans (724 / 419 / 329 events) for yr0 / yr1 / yr2; 100 later-round scans dropped (time ≤ 0, 2 events).
+  Train patients with 1 / 2 / 3 scans: 1,185 / 3,398 / 6,859. CPU smoke ⬜.
 - **R3 runs** ⬜ `rounds/joint_s0–s2` (`sbatch --mem 160g`, staggered), then S5 + 3-seed ensemble.
   Compare ΔC over clinical with `joint` s0/s1/s2 (+0.035/+0.026/+0.049) and `joint_ens3` (+0.043 [+0.007, +0.084]).
 

@@ -952,3 +952,17 @@ diagnosed soon after a scan (no censoring), weigh patients the same, same segmen
   scan per patient per epoch with uniform frequencies (0.33/0.33/0.33 for 3 scans, 0.5/0.5 for 2).
   Not yet run with torch (no local torch) → CPU smoke on the cluster before the GPU runs.
 
+
+**S14 run (2026-11-02, cluster worktree `student_pipeline/.claude/worktrees/joint-multiround`).** 20,826
+QC-passing yr1/yr2 scans (1 scan date imputed); 100 dropped with time ≤ 0, only 2 of them events (patients
+diagnosed before T1/T2 mostly have no later scan on disk; the 98 controls have canc_free_days before the scan).
+`data/rounds_cohort.csv`: 34,619 scans of 13,893 patients.
+
+| split / round | scans | events | median follow-up (y) | events ≤ 1 y after the scan |
+|---|---|---|---|---|
+| train yr0 / yr1 / yr2 | 11,442 / 8,600 / 8,516 | 724 / 419 / 329 | 6.60 / 5.63 / 4.63 | 209 / 86 / 105 |
+| val yr0 / yr1 / yr2 | 2,451 / 1,792 / 1,818 | 155 / 92 / 70 | 6.60 / 5.63 / 4.63 | 37 / 24 / 23 |
+
+Train patients with 1 / 2 / 3 scans: 1,185 / 3,398 / 6,859 (val 265 / 762 / 1,424). With one scan per patient
+per epoch, an epoch still has 724 events; the gain is variety (another scan of the same lungs, later
+time origin), not more events. Over 80 epochs a 3-scan patient is seen ~27 times per round.
