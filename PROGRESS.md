@@ -910,3 +910,25 @@ resubmitted (only the failed 7122344 exists).
   benign nodules ignored), plus a local sensitivity to visible early cancers in their lobe (the 33 dx ≤ 1 y).
   That part is detection-like and is what the T0 read already covers; S13's ΔC over clinical + T0 read
   (+0.043 for s0) is the part beyond it.
+
+**Mask holes (user request, 2026-11-02).** Native CT + TotalSegmentator seg of 102806 and 204909 copied to
+`BRP1/hole_cases/` (not in the repo) with slice figures. 102806 (LLL 73 mm, posterior paravertebral):
+slices z ≈ 52–76 of the 1×1×2 mm file; most of the mass is labelled 52 (= the label of the descending aorta
+next to it) → cut out of the lung mask, only a rim stays lung (the round shapes at z 43–50 are the liver/
+spleen domes, not tumour). 204909 (LUL 61 mm, hilar, spiculated): z ≈ 102–115, unlabelled (0) and outside the
+lung contour, i.e. counted as mediastinum. → Large central/paravertebral solid tumours reach the network as
+a hole/dent in the lung mask plus the 5 mm dilated rim, not as tumour tissue.
+
+**S6 on `clinical_cox/joint_s2` (job 7168208, 22.8 min, 421 val patients).** η check 2e-5; orientation 1.0 / 0.986.
+- Lobe pattern (occlusion median): LUL 0.93, LLL 0.58, RUL 1.36, RML 0.82, RLL 0.75 (s0: 0.60/0.70/1.28/0.63/1.08).
+  Mean map: one region in the mid right lung (hilar level, lateral), events ≈ controls.
+- Cancer lobe: dx ≤ 1 y 1.70 vs 1.02 (p 0.005), hit 0.55 (s0 0.58); dx > 1 y 0.91 (p 0.29), hit 0.26.
+- T0 nodule ≥ 10 mm lobe: events 1.58 vs 0.89 (p 0.003), hit 0.49 (s0 0.40); controls 1.08 (p 0.10), hit 0.30
+  (s0 0.22; chance 0.20).
+- Raw η, masses ≥ 20 mm: events median −0.03 vs controls −0.76 (s0 −0.44 vs −0.61): s2 separates malignant
+  from benign large masses more. Figures: the occlusion peak sits on the mass / mask hole in all 4 largest events
+  and in benign controls too (200508, 76 mm, η 1.20).
+- **Reading.** s2 ≈ s0 in mechanism: a general pattern (same region in events and controls, no localisation of
+  cancers > 1 y), plus a somewhat stronger local response to visible cancers and large masses. This matches S13
+  (s2 alone reacts to > 20 mm masses; it is also best in nodule-free patients). Part of s2's early (1 y) gain is
+  therefore detection of visible masses, partly through mask holes; the general part is shared by all runs.

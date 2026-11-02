@@ -198,5 +198,6 @@ does not overfit. Why, and did it learn the nodules?
   in every run. s2: better in nodule-free patients too (0.717) + only run that reacts to masses > 2 cm.
 - **A2 S6 on joint runs** ✅ `joint` (s0): looks at the lateral right lung (not the bases); localises the lobe of
   cancers diagnosed ≤ 1 y (hit 0.58 vs 0.21, p 0.004) but not later cancers nor benign nodules (hit 0.22).
-  ⬜ **user: resubmit `joint_s2`** (job 7122344 ran old code).
+  ✅ `joint_s2` (job 7168208): same mechanism, stronger response to visible cancers/large masses (nodule-lobe hit in
+  events 0.49 vs 0.40; controls 0.30 vs 0.22). Large tumours reach the input as mask holes (`hole_cases/`).
 - ⬜ S5 with clinical + T0 read as the reference (test), all runs: the new bar for "added value".
