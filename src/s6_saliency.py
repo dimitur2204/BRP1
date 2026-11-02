@@ -34,9 +34,21 @@ Lobe analysis (does the map point at the lobe where the cancer was found?):
   a model that looks at the upper lobes in everyone would beat a naive 1-in-5
   chance level without ever finding a tumour.
 
+T0-nodule analysis (does the map point at the nodule the radiologist saw?):
+  With data/t0_findings.csv (written by s13_t0_findings.py), every val patient
+  whose largest T0 nodule is >= --nodule-min mm is added, events and controls
+  alike. Enrichment of the nodule's lobe (ctab sct_epi_loc) is compared with
+  the same lobe in patients without any T0 nodule. A nodule detector lights up
+  the nodule lobe in controls with benign nodules too.
+
+Runs trained with --clinical (model.ClinicalCox): the saliency is of the image
+part (the clinical term does not depend on the CT).
+
 Outputs, runs/{run}/saliency_{split}/:
   patients.csv        pid, group, eta, time, event, cancer lobes, per-lobe
                       enrichment for both methods
+  nodule_summary.csv  per method and group (all / events / controls): nodule-lobe
+                      enrichment vs the same lobe without a nodule, hit rate
   lobe_summary.csv    per method and follow-up stratum (all / dx <= 1 y / > 1 y):
                       median enrichment of the cancer lobe in events vs the
                       same lobe in controls and in other-lobe events, top-lobe
@@ -68,7 +80,7 @@ from scipy import ndimage
 from scipy.stats import mannwhitneyu
 
 from model import LungCNN, to_input
-from nlst import (CACHE_INDEX, CACHE_NPY, COHORT_CSV, GRID, LUNG_LABELS, PRSN_CSV, RUNS_DIR,
+from nlst import (CACHE_INDEX, CACHE_NPY, COHORT_CSV, DATA, GRID, LUNG_LABELS, PRSN_CSV, RUNS_DIR,
                   SEG_DIR, SPACING_MM)
 
 # TotalSegmentator v2 "total" lung labels (checked against the anatomy in check_orientation)
@@ -101,13 +113,20 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--seg-dir", default=str(SEG_DIR))
     ap.add_argument("--prsn", default=str(PRSN_CSV))
     ap.add_argument("--runs-dir", default=str(RUNS_DIR))
+    ap.add_argument("--t0", default=str(DATA / "t0_findings.csv"),
+                    help="s13 T0 findings; skipped if the file is missing")
+    ap.add_argument("--nodule-min", type=float, default=10.0,
+                    help="add every patient whose largest T0 nodule is >= this [mm]")
     return ap.parse_args()
 
 
 def load_model(path: Path, device) -> LungCNN:
     ckpt = torch.load(path, map_location="cpu", weights_only=False)
     model = LungCNN(dropout=ckpt["config"]["dropout"])
-    model.load_state_dict(ckpt["state_dict"])
+    state = ckpt["state_dict"]
+    if "beta" in state:  # model.ClinicalCox: keep the image network (eta_img)
+        state = {k[len("image."):]: v for k, v in state.items() if k.startswith("image.")}
+    model.load_state_dict(state)
     print(f"loaded {path}: epoch {ckpt['epoch']}, val C {ckpt['val_c']:.4f}", flush=True)
     return model.to(device).eval()
 
@@ -249,6 +268,29 @@ def lobe_summary(pts: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def nodule_summary(pts: pd.DataFrame, nodule_min: float) -> pd.DataFrame:
+    """Enrichment of the largest T0 nodule's lobe vs the same lobe in patients without a nodule."""
+    rows = []
+    nod = pts[(pts.max_dia >= nodule_min) & (pts.nodule_lobe != "")]
+    ref = pts[pts.max_dia == 0]
+    for m in METHODS:
+        for gname, g in {"all": nod, "events": nod[nod.event == 1], "controls": nod[nod.event == 0]}.items():
+            if g.empty:
+                continue
+            own = g.apply(lambda p: p[f"{m}_{p.nodule_lobe}"], axis=1).to_numpy(float)
+            ref_m = g.nodule_lobe.map(lambda l: ref[f"{m}_{l}"].median()).to_numpy(float)
+            dens = g[[f"{m}_{l}" for l in LOBES.values()]].astype(float)
+            hit = (dens.idxmax(axis=1).str[len(m) + 1:] == g.nodule_lobe).to_numpy()
+            ok = ~np.isnan(own) & ~np.isnan(ref_m)
+            rows.append({"method": m, "group": gname, "n": int(ok.sum()),
+                         "enrich_nodule_lobe_median": np.nanmedian(own),
+                         "same_lobe_no_nodule_median": np.nanmedian(ref_m),
+                         "share_above_ref": float(np.mean(own[ok] > ref_m[ok])) if ok.any() else np.nan,
+                         "p_vs_no_nodule": mannwhitneyu(own[ok], ref_m[ok]).pvalue if ok.sum() > 1 else np.nan,
+                         "top_lobe_hit_rate": float(hit.mean()), "top_lobe_chance": 1 / len(LOBES)})
+    return pd.DataFrame(rows)
+
+
 def overlay(ax, ct2d, sal2d, title, cmap="hot"):
     ax.imshow(ct2d.T, cmap="gray", origin="lower", vmin=0, vmax=1)
     if sal2d is not None:
@@ -270,6 +312,8 @@ def figure(group: str, items: list, out: Path) -> None:
         px, py, pz = np.unravel_index(np.argmax(occ), occ.shape)
         lobes = it["cancer_lobes"] or "-"
         head = f"{it['pid']} eta={it['eta']:.2f} ev={it['event']} lobe={lobes}"
+        if it.get("max_dia"):
+            head += f" T0 nodule {it['max_dia']:.0f} mm {it['nodule_lobe'] or '?'}"
         overlay(axes[r, 0], x[:, :, pz], None, f"{head}\naxial z={pz}")
         overlay(axes[r, 1], x[:, :, pz], occ[:, :, pz], "occlusion (axial)")
         overlay(axes[r, 2], x[:, py, :], occ[:, py, :], f"occlusion (coronal y={py})")
@@ -321,6 +365,13 @@ def main() -> None:
         {LOBES[CANCER_LOBE_COLS[c]] for c in CANCER_LOBE_COLS if p in lobes.index and lobes.at[p, c]},
         key=list(LOBES.values()).index)))
     df.loc[df.event == 0, "cancer_lobes"] = ""
+    df["max_dia"], df["nodule_lobe"] = 0.0, ""
+    if Path(a.t0).exists():
+        t0 = pd.read_csv(a.t0, dtype={"pid": str}).set_index("pid")
+        df["max_dia"] = df.pid.map(t0.max_dia).fillna(0.0)
+        df["nodule_lobe"] = df.pid.map(t0.nodule_lobe.map(LOBES)).fillna("")
+    else:
+        print(f"no {a.t0}: T0-nodule analysis skipped (run s13_t0_findings.py first)", flush=True)
     centres = pd.read_csv(a.cache_index, dtype={"pid": str}).set_index("pid")[["centre_x", "centre_y", "centre_z"]]
     cache = np.load(a.cache, mmap_mode="r")
 
@@ -334,6 +385,10 @@ def main() -> None:
     ev, ct = df[df.event == 1], df[df.event == 0]
     groups = {"high_eta_events": ev.nlargest(k, "eta").index, "low_eta_events": ev.nsmallest(k, "eta").index,
               "high_eta_controls": ct.nlargest(k, "eta").index}
+    big = df[df.max_dia >= a.nodule_min]
+    if len(big):
+        groups["largest_t0_nodule_events"] = big[big.event == 1].nlargest(k, "max_dia").index
+        groups["largest_t0_nodule_controls"] = big[big.event == 0].nlargest(k, "max_dia").index
     if a.pids:
         sel = df.index[df.pid.isin(a.pids.split(","))]
         groups = {"selected": sel}
@@ -342,7 +397,7 @@ def main() -> None:
         ev_idx = list(ev.index[:a.limit] if a.limit else ev.index)
         n_ct = len(ev_idx) if a.n_controls < 0 else a.n_controls
         ct_idx = list(rng.choice(ct.index, size=min(n_ct, len(ct)), replace=False))
-        todo = sorted(set(ev_idx) | set(ct_idx) | {i for g in groups.values() for i in g})
+        todo = sorted(set(ev_idx) | set(ct_idx) | set(big.index) | {i for g in groups.values() for i in g})
     fig_idx = {i for g in groups.values() for i in g}
 
     rows, items, orient = [], {}, []
@@ -356,7 +411,8 @@ def main() -> None:
         cam = gradcam(model, x, a.gradcam_layer)
         occ_np, cam_np, x_np = occ.cpu().numpy(), cam.cpu().numpy(), x.cpu().numpy()
         row = {"pid": p.pid, "event": int(p.event), "time": int(p.time), "eta": float(p.eta),
-               "eta_check": eta0, "cancer_lobes": p.cancer_lobes, "n_occlusions": n_pos}
+               "eta_check": eta0, "cancer_lobes": p.cancer_lobes, "max_dia": float(p.max_dia),
+               "nodule_lobe": p.nodule_lobe, "n_occlusions": n_pos}
         if not a.pids:
             lab = lobe_labels(p.pid, centres.loc[p.pid].to_numpy(float), Path(a.seg_dir), x_np > 0)
             orient.append(check_orientation(lab))
@@ -368,7 +424,8 @@ def main() -> None:
         rows.append(row)
         if i in fig_idx:
             items[i] = {"pid": p.pid, "eta": float(p.eta), "event": int(p.event),
-                        "cancer_lobes": p.cancer_lobes, "x": x_np, "occ": occ_np, "cam": cam_np}
+                        "cancer_lobes": p.cancer_lobes, "max_dia": float(p.max_dia),
+                        "nodule_lobe": p.nodule_lobe, "x": x_np, "occ": occ_np, "cam": cam_np}
             np.savez_compressed(out / "maps" / f"{p.pid}.npz", occlusion=occ_np.astype(np.float16),
                                 gradcam=cam_np.astype(np.float16))
         print(f"[{n}/{len(todo)}] {p.pid} ev={int(p.event)} eta={p.eta:.3f} "
@@ -388,6 +445,10 @@ def main() -> None:
         summ.to_csv(out / "lobe_summary.csv", index=False)
         print(summ.round(3).to_string(index=False))
         mean_maps(acc, out)
+        if (pts.max_dia >= a.nodule_min).any():
+            ns = nodule_summary(pts, a.nodule_min)
+            ns.to_csv(out / "nodule_summary.csv", index=False)
+            print(ns.round(3).to_string(index=False))
     for g, idx in groups.items():
         figure(g, [items[i] for i in idx if i in items], out)
     print(f"done in {(time.time() - t0) / 60:.1f} min -> {out}")

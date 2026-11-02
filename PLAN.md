@@ -184,3 +184,18 @@ only the risk they do not explain (goal: general lung features with ΔC over cli
   **3-seed ensemble ΔC +0.043 [+0.007, +0.084]**, first CI > 0 (ensemble chosen post hoc, all
   seeds used). ⬜ user decision: next step (e.g. offset seeds, censor year-1 cancers, ensemble as default).
 - CNN only (user, 2026-10-27): not applied to the S12 ViT fine-tune.
+
+# Next: why is `joint_s2` better? Nodules or general lung features? (branch `joint-s2-analysis`)
+
+Worktree `.claude/worktrees/joint-s2-analysis` (from `cnn-clinical-cox` f4f00b5), 2026-11-02. Design:
+`docs/pipeline.md` §12. Question (user): `joint_s2` (test ΔC +0.049, val C 0.736) is the best run and
+does not overfit. Why, and did it learn the nodules?
+
+- **A0 T0 read** ✅ (local, public `ctab`): T0 max nodule diameter alone val C 0.684; CV clinical 0.63 →
+  clinical + T0 nodules 0.72. 89–91% of ≤ 1 y cancers had a T0 nodule (median 15–18 mm).
+- **A1 `s13_t0_findings.py`** code ✅ (synthetic check ✅). ⬜ **user (login node):** run it on
+  cosine, joint s0/s1/s2, offset.
+- **A2 S6 on joint runs** code ✅ (ClinicalCox loading, T0-nodule lobe test). ⬜ **user:**
+  `submit_s6_saliency.sh` on `clinical_cox/joint_s2` and `clinical_cox/joint` (after A1).
+- ⬜ Depending on A1/A2: S5 with clinical + T0 read as the reference (test), and the decision about
+  what counts as success.

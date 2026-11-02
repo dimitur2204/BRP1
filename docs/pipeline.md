@@ -531,7 +531,7 @@ during training, so the CNN is rewarded only for risk they do not explain:
 | input | the 2.5 mm `data/cache/lungs_u8.npy` (S2; the "big cut" used by every run so far). S4 stops if the cache volumes are not 144×128×128, so the 1.4 mm cache (`lungs_1p4mm_u8.npy`, another pipeline) cannot be used by mistake | same input as `cosine` |
 
 Without `--clinical`, S4 is unchanged (same model, `model.pt` keys and `pred.csv`). `s6_saliency.py`
-loads a plain `LungCNN` and does not read `ClinicalCox` checkpoints (keys `image.*`, `beta`).
+reads `ClinicalCox` checkpoints (keys `image.*`, `beta`) as their image CNN, i.e. the saliency of η_img (§12).
 
 ```bash
 sbatch src/submit_s4_train.sh --run-name clinical_cox/offset --clinical age,sex,cigsmok,lung_ml,lung_mean_hu
@@ -556,3 +556,35 @@ to ≤ 0.10 in absolute value; with age from 0.23 to 0.16–0.19.
 Joint seeds (2026-10-28): ΔC s0 +0.035, s1 +0.026 [−0.012, +0.061], s2 +0.049 [+0.013, +0.090].
 Ensemble of the three (mean of val-z-scored η, `runs/clinical_cox/joint_ens3`, S5 `--added-only`):
 test clinical + η 0.697, **ΔC +0.043 [+0.007, +0.084]**, p_boot 0.014; ΔC after 1 y +0.034.
+
+## 12. Did a run learn the T0 nodules? (`src/s13_t0_findings.py` + S6, branch `joint-s2-analysis`)
+
+Why: `clinical_cox/joint_s2` is the best single run (test ΔC +0.049), and its extra gain is at
+1 y (ΔAUC 1 y +0.103 vs +0.02–0.04 for s0/s1). The goal is general lung features, not
+nodule detection (PROGRESS 2026-10-26), and nodules are visible at 2.5 mm: 89–91% of cancers
+diagnosed within 1 y had a T0 nodule ≥ 4 mm, median longest diameter 15–18 mm (6–7 voxels).
+
+Reference: the radiologist's T0 read in the public `ctab` table (study_yr 0, one row per
+abnormality): nodule ≥ 4 mm (`sct_ab_desc` 51) with longest diameter and lobe of the epicentre,
+margins, and other findings (emphysema 59, fibrosis 61, ...). Unlike prsn's cancer lobe, this
+exists for **controls** too, and controls with large benign nodules are the key test: a nodule
+detector scores them high, a general lung score does not.
+
+| choice | value | why |
+|---|---|---|
+| splits | train and val only; S13 refuses test | test discipline (only S5 reads test) |
+| η scale | val SD units, 0 = mean of val controls without a T0 nodule | comparable across runs |
+| strata C | all; no T0 nodule; events ≤ 1 y removed; both | a detector loses its C in the nodule-free patients |
+| added value | 5-fold CV Cox on the split: clinical, + T0 nodules (`any_nodule`, `log1p(max_dia)`), each + η; paired bootstrap of the pooled out-of-fold scores (no refit inside) | ΔC over **clinical + T0 read** is the fair bar in screening, where the read is always available |
+| saliency | S6 adds every val patient with a T0 nodule ≥ `--nodule-min` (10 mm); nodule-lobe enrichment vs the same lobe in patients without a nodule, for events and controls; figures of the largest nodules | lobe level, because `sct_slice_num` refers to the radiologist's series, not necessarily ours |
+
+Synthetic check (real cohort + ctab, fake η, val): a pure nodule score (`log1p(max_dia)` + noise)
+gives C 0.48 in nodule-free patients, AUC 0.97 for nodules ≥ 10 mm in controls and ΔC −0.004 over
+clinical + T0; a nodule-blind score (age + lung_ml + noise) keeps C 0.62 in nodule-free patients.
+Real data (val): T0 max nodule diameter alone C 0.684; CV C clinical 0.63 → clinical + T0 0.72.
+
+```bash
+env/.venv/bin/python src/s13_t0_findings.py                    # login node, writes data/t0_findings.csv first
+sbatch src/submit_s6_saliency.sh --run clinical_cox/joint_s2
+sbatch --begin=now+20minutes src/submit_s6_saliency.sh --run clinical_cox/joint
+```

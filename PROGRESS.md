@@ -807,3 +807,50 @@ Ensemble = mean of the three seeds' η, each z-scored on val; `runs/clinical_cox
 picked). Reading: across seeds, joint adds ~+0.03–0.05 C over clinical; the ensemble is the
 first result with a ΔC CI above 0. Part of the gain is early (largest at 1 y), but ΔC among patients
 event-free at 1 y is still +0.03 in every seed, so it is not only prevalent cancers.
+
+## 2026-11-02: why is `joint_s2` better? (worktree `joint-s2-analysis`)
+
+**Question (user).** `joint_s2` performs best (val C total 0.736 vs 0.712/0.697; test ΔC +0.049) without
+overfitting. Why? Did it learn the nodules, and are they even visible at 2.5 mm?
+
+**Clues already in the results.** (1) s2's extra gain is early: ΔAUC 1 y +0.103 (s0 +0.037, s1 +0.023),
+but ΔC after 1 y +0.031 ≈ the other seeds (+0.034/+0.026). (2) s2's val η correlates only 0.69/0.71 with
+s0/s1 (s0–s1 0.88): it learned something different. (3) η alone on test 0.667 vs 0.60–0.63. All three
+fit "s2 also detects cancers already visible at T0".
+
+**T0 read from public `ctab` (local, labels only, no predictions).**
+
+| largest T0 nodule | train n / events / events ≤ 1 y | event rate | val n / events / ≤ 1 y |
+|---|---|---|---|
+| none | 8,286 / 302 / 19 | 3.6% | 1,769 / 68 / 4 |
+| 4–6 mm | 1,594 / 79 / 11 | 5.0% | 334 / 21 / 3 |
+| 6–10 mm | 934 / 104 / 23 | 11.1% | 222 / 23 / 4 |
+| 10–20 mm | 464 / 147 / 82 | 31.7% | 81 / 21 / 9 |
+| > 20 mm | 164 / 92 / 74 | 56.1% | 45 / 22 / 17 |
+
+- 89% (val) / 91% (train) of cancers diagnosed ≤ 1 y had a T0 nodule ≥ 4 mm, median 18 / 15 mm (= 6–7
+  voxels at 2.5 mm, so visible on our input). Events > 1 y: 45% had one (median 0).
+- ~5% of patients (nodule ≥ 10 mm) hold 28% of val events and 70% of val events ≤ 1 y.
+- Val C of T0 max nodule diameter alone **0.684** (≈ `cosine` 0.688); positive T0 screen 0.652.
+  5-fold CV on val: clinical 0.63 → **clinical + T0 nodules 0.72**.
+- Emphysema reported at T0 in 31%, fibrosis/scar in 20%.
+
+**Reading so far.** Our "clinical" reference has no T0 read, yet in screening the read is always
+there. A model that re-detects large nodules gets ΔC over clinical for free and would add nothing
+over clinical + T0 read. Whether `joint_s2` does this is the open question → S13 + S6 below.
+
+**Built.** `src/s13_t0_findings.py` (§12): T0 findings table, η by nodule size for events/controls,
+strata C (no nodule / no ≤ 1 y event), CV ΔC over clinical and over clinical + T0 nodules, LR test.
+Train/val only. `s6_saliency.py`: loads `ClinicalCox` checkpoints (image part), adds all val
+patients with a T0 nodule ≥ 10 mm, `nodule_summary.csv` (nodule-lobe enrichment, events vs
+controls), figures of the largest nodules.
+
+**Checks (local scratch venv, real cohort + ctab, fake η).** S13: nodule score → C 0.48 without
+nodule, AUC 0.97 for ≥ 10 mm in controls, ΔC over clinical + T0 −0.004 [−0.013, 0.006]; nodule-blind
+score (age + lung_ml) → C 0.62 without nodule. S6: ClinicalCox checkpoint loads to exactly the image
+CNN's output; `nodule_summary` on synthetic saliency with the nodule lobe raised gives hit rate 0.97
+(occ) and chance 0.22 for the unraised method. Full S6 not run (needs the cache / GPU).
+
+**Next (user).** Cluster login expired, so nothing has been run on the real predictions yet. Copy
+`src/s13_t0_findings.py` + `src/s6_saliency.py` to `plamen_pipeline`, run S13 (login node), then S6
+on `clinical_cox/joint_s2` and `clinical_cox/joint`.
