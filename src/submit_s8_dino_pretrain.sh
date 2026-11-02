@@ -6,8 +6,8 @@
 #SBATCH --mem       64g
 #SBATCH --time      02:00:00
 #SBATCH --job-name  s8_dino
-#SBATCH --output    /faststorage/project/aura_thymus/plamen_pipeline/logs/s8_%x_%j.out
-#SBATCH --error     /faststorage/project/aura_thymus/plamen_pipeline/logs/s8_%x_%j.err
+#SBATCH --output    logs/s8_%x_%j.out
+#SBATCH --error     logs/s8_%x_%j.err
 
 # S8 -- DINOv2 pretraining. All arguments are passed to s8_dino_pretrain.py.
 # D2 smoke/throughput (gpu-short, < 2 h; the defaults above):
@@ -20,7 +20,8 @@
 # GenomeDK cancels GPU jobs averaging < 75% after 2 h).
 
 set -euo pipefail
-PROJECT=/faststorage/project/aura_thymus/plamen_pipeline
+PROJECT="$SLURM_SUBMIT_DIR"   # the checkout/worktree sbatch is run from (its root)
+[ -f "$PROJECT/src/nlst.py" ] || { echo "run sbatch from the project root ($PROJECT has no src/nlst.py)"; exit 1; }
 mkdir -p "$PROJECT/logs"
 export WANDB_MODE=disabled
 export PYTHONPATH="$PROJECT/src"

@@ -6,8 +6,8 @@
 #SBATCH --time      01:30:00
 #SBATCH --array     0-39
 #SBATCH --job-name  s2_preprocess
-#SBATCH --output    /faststorage/project/aura_thymus/plamen_pipeline/logs/s2_%A_%a.out
-#SBATCH --error     /faststorage/project/aura_thymus/plamen_pipeline/logs/s2_%A_%a.err
+#SBATCH --output    logs/s2_%A_%a.out
+#SBATCH --error     logs/s2_%A_%a.err
 
 # S2 -- lung volumes for the s1 candidates (CPU only). 40 tasks x ~415 pids
 # x ~1.5 s/pid ~= 10-20 min each. Finished chunks are skipped, so failed
@@ -17,7 +17,8 @@
 #   env/.venv/bin/python src/s3_cohort.py
 
 set -euo pipefail
-PROJECT=/faststorage/project/aura_thymus/plamen_pipeline
+PROJECT="$SLURM_SUBMIT_DIR"   # the checkout/worktree sbatch is run from (its root)
+[ -f "$PROJECT/src/nlst.py" ] || { echo "run sbatch from the project root ($PROJECT has no src/nlst.py)"; exit 1; }
 mkdir -p "$PROJECT/logs"
 source "$PROJECT/env/.venv/bin/activate"
 cd "$PROJECT/src"
