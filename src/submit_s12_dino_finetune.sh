@@ -6,8 +6,8 @@
 #SBATCH --mem       96g
 #SBATCH --time      08:00:00
 #SBATCH --job-name  s12_ft
-#SBATCH --output    /faststorage/project/aura_thymus/plamen_pipeline/logs/s12_%x_%j.out
-#SBATCH --error     /faststorage/project/aura_thymus/plamen_pipeline/logs/s12_%x_%j.err
+#SBATCH --output    logs/s12_%x_%j.out
+#SBATCH --error     logs/s12_%x_%j.err
 
 # S12 -- fine-tune the DINO ViT with a Cox loss (or the same ViT from scratch). All arguments
 # are passed to s12_dino_finetune.py:
@@ -22,7 +22,8 @@
 # GenomeDK cancels GPU jobs averaging < 75% GPU utilisation after 2 h (check: jobinfo <jobid>).
 
 set -euo pipefail
-PROJECT=/faststorage/project/aura_thymus/plamen_pipeline
+PROJECT="$SLURM_SUBMIT_DIR"   # the checkout/worktree sbatch is run from (its root)
+[ -f "$PROJECT/src/nlst.py" ] || { echo "run sbatch from the project root ($PROJECT has no src/nlst.py)"; exit 1; }
 mkdir -p "$PROJECT/logs"
 export WANDB_MODE=disabled
 export PYTHONPATH="$PROJECT/src"

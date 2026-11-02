@@ -32,9 +32,18 @@ it is reused: no cohort, no split, no cache, no code.
 | S12 ViT fine-tune (D6) | `src/s12_dino_finetune.py` via `submit_s12_dino_finetune.sh` (1 GPU, ~4 h on an L40S) | Slurm | `runs/finetune/{name}/` (S4 format → S5) |
 | S14 rounds cohort | `src/s14_rounds_cohort.py` | login node, seconds | `data/rounds_cohort.csv` (→ `s4_train.py --train-scans`) |
 
-Cluster folder (since 2026-10-26): `/faststorage/project/aura_thymus/plamen_pipeline`. The large
-shared items (`data/cache`, `data/external`, `env`, `ext`, the runs up to 2026-10-20) are symlinks
-into `student_pipeline/`, which another pipeline now uses; new runs and logs live here.
+Cluster folders (since 2026-11-02): one git worktree per branch inside the shared repo
+`/faststorage/project/aura_thymus/student_pipeline` (Dimitar's checkout, agreed by the user), at
+`student_pipeline/.claude/worktrees/{branch}` (e.g. `joint-s2-analysis`, `joint-multiround`).
+In each worktree, `env`, `ext`, `data/cache` and `data/external` are symlinks to the shared copies in
+`student_pipeline/`; untracked data CSVs (`ssl_scans.csv`, `t0_findings.csv`, ...) are copied in;
+`runs/{name}` of earlier runs are symlinks to their folders (old ones in
+`/faststorage/project/aura_thymus/plamen_pipeline/runs`, the folder used 2026-10-26 to 11-02, now
+read-only history); new runs and `logs/` live in the worktree. Submit scripts use `$SLURM_SUBMIT_DIR`,
+so always `cd` into the worktree and run `sbatch src/submit_*.sh ...` from its root; `logs/` must
+exist there (Slurm opens the log before the script runs). Git on the cluster needs
+`git config --global --add safe.directory /faststorage/project/aura_thymus/student_pipeline` (and
+each worktree path); branches are fetched over https (no GitHub key on the cluster).
 
 Run folders (`runs/`, regrouped 2026-10-20; every script takes the path below `runs/` as the
 run name, e.g. `s5_evaluate.py --run cosine_improved_trial/epb4_s0`):
