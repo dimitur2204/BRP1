@@ -851,6 +851,42 @@ score (age + lung_ml) → C 0.62 without nodule. S6: ClinicalCox checkpoint load
 CNN's output; `nodule_summary` on synthetic saliency with the nodule lobe raised gives hit rate 0.97
 (occ) and chance 0.22 for the unraised method. Full S6 not run (needs the cache / GPU).
 
-**Next (user).** Cluster login expired, so nothing has been run on the real predictions yet. Copy
-`src/s13_t0_findings.py` + `src/s6_saliency.py` to `plamen_pipeline`, run S13 (login node), then S6
-on `clinical_cox/joint_s2` and `clinical_cox/joint`.
+**Cluster.** The user's rsync did not arrive (run from the wrong directory), so S6 job 7122344
+(`joint_s2`) ran the old S6 and failed at `load_state_dict` (keys `image.*`, `beta`). Claude copied both
+files and ran S13 on the login node (36 min) before the pending job 7122345 (`joint`) started.
+⬜ user: resubmit S6 for `joint_s2`.
+
+**S13 results (`runs/t0_findings/`; val = 5-fold CV inside val; train = in-sample fit split).**
+
+| run | val C all / no T0 nodule / no nodule & no ≤ 1 y event | AUC η: nodule ≥ 10 mm in controls | ρ η–emphysema | val CV ΔC over clinical + T0 [95% CI] | train ΔC |
+|---|---|---|---|---|---|
+| cosine | 0.688 / 0.701 / 0.709 | 0.573 | 0.275 | +0.047 [+0.020, +0.074] | +0.033 |
+| joint s0 | 0.679 / 0.698 / 0.696 | 0.571 | 0.250 | +0.043 [+0.014, +0.073] | +0.028 |
+| joint s1 | 0.658 / 0.677 / 0.678 | 0.565 | 0.249 | +0.039 [+0.015, +0.065] | +0.028 |
+| **joint s2** | **0.709 / 0.717 / 0.718** | 0.617 | 0.283 | **+0.055 [+0.028, +0.084]** | +0.035 |
+| offset | 0.668 / 0.672 / 0.668 | 0.550 | 0.230 | +0.040 [+0.016, +0.065] | +0.037 |
+
+CV C on val: clinical 0.63 → clinical + T0 nodules 0.72–0.73 → + η 0.76–0.78. η's HR per SD adjusted
+for clinical + T0 nodules 1.49–1.82, LR p < 1e-4 in every run.
+
+Mean η (val SD units, 0 = nodule-free val controls), val:
+
+| largest T0 nodule | n ctrl / ev | controls: cosine / s0 / s1 / **s2** | events: cosine / s0 / s1 / **s2** |
+|---|---|---|---|
+| none | 1,699 / 68 | 0 / 0 / 0 / 0 | 0.81 / 0.81 / 0.74 / 0.81 |
+| 4–6 mm | 315 / 21 | −0.06 / −0.09 / −0.08 / −0.01 | 0.95 / 0.84 / 0.77 / 0.90 |
+| 6–10 mm | 199 / 23 | 0.08 / 0.11 / 0.10 / 0.10 | 0.46 / 0.44 / 0.31 / 0.58 |
+| 10–20 mm | 60 / 21 | 0.26 / 0.16 / 0.18 / 0.33 | 0.43 / 0.50 / 0.54 / 0.47 |
+| > 20 mm | 23 / 22 | 0.14 / 0.52 / 0.35 / **0.86** | 0.92 / 1.08 / 0.93 / **2.06** |
+
+**Reading. My nodule hypothesis was wrong for the bulk of the signal.** No run is a nodule
+detector: events WITHOUT any T0 nodule score +0.7–0.8 SD (as high as events with nodules),
+C is as high or higher in nodule-free patients, controls with benign 4–20 mm nodules score ~0, and η
+barely tracks nodule size (ρ 0.02–0.11). Every run adds ΔC +0.04–0.055 over clinical + the T0 read on
+val (CI > 0), +0.03–0.04 on train: the signal is general lung risk and it is NOT in the radiologist's
+nodule read. η tracks reported emphysema (ρ 0.23–0.28), a general lung feature.
+**s2's difference:** (1) it is better everywhere, incl. nodule-free patients (0.717 vs 0.67–0.70), and
+(2) it alone reacts strongly to masses > 2 cm (events +2.06 SD vs ~1.0; benign > 2 cm controls +0.86,
+n = 23). > 20 mm masses are 38% ≤ 1 y cancers, which fits its test ΔAUC 1 y +0.103. Caveats: val chose
+the epoch (best val C), so val numbers are optimistic, most for s2 (val C 0.736); on train s2's ΔC over
+clinical + T0 (+0.035) ≈ offset (+0.037). Test not touched.

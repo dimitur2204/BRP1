@@ -193,9 +193,9 @@ does not overfit. Why, and did it learn the nodules?
 
 - **A0 T0 read** ✅ (local, public `ctab`): T0 max nodule diameter alone val C 0.684; CV clinical 0.63 →
   clinical + T0 nodules 0.72. 89–91% of ≤ 1 y cancers had a T0 nodule (median 15–18 mm).
-- **A1 `s13_t0_findings.py`** code ✅ (synthetic check ✅). ⬜ **user (login node):** run it on
-  cosine, joint s0/s1/s2, offset.
-- **A2 S6 on joint runs** code ✅ (ClinicalCox loading, T0-nodule lobe test). ⬜ **user:**
-  `submit_s6_saliency.sh` on `clinical_cox/joint_s2` and `clinical_cox/joint` (after A1).
-- ⬜ Depending on A1/A2: S5 with clinical + T0 read as the reference (test), and the decision about
-  what counts as success.
+- **A1 `s13_t0_findings.py`** ✅ run (2026-11-02, login node). **Not nodule detectors:** C in nodule-free
+  patients ≥ overall; benign-nodule controls score ~0; val CV ΔC over clinical + T0 read +0.04–0.055 (CI > 0)
+  in every run. s2: better in nodule-free patients too (0.717) + only run that reacts to masses > 2 cm.
+- **A2 S6 on joint runs** code ✅. `joint` running (job 7122345). `joint_s2` job 7122344 failed (old
+  code on cluster) → ⬜ **user: resubmit.**
+- ⬜ S5 with clinical + T0 read as the reference (test), all runs: the new bar for "added value".
