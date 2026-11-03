@@ -966,3 +966,23 @@ diagnosed before T1/T2 mostly have no later scan on disk; the 98 controls have c
 Train patients with 1 / 2 / 3 scans: 1,185 / 3,398 / 6,859 (val 265 / 762 / 1,424). With one scan per patient
 per epoch, an epoch still has 724 events; the gain is variety (another scan of the same lungs, later
 time origin), not more events. Over 80 epochs a 3-scan patient is seen ~27 times per round.
+
+**R3 first seed: `rounds/joint_s1` (job 7202878, 2026-11-02; s0/s2 = 7202876/9 held by cluster maintenance).**
+Load 28,558 train scans 1,550 s; ~145 s/epoch (yr0-only joint ~64 s) → ~3.6 h. Best epoch 73 (val C).
+β moved little from the start (age 0.47 → 0.37). Val η corr with `joint_s1` 0.76.
+
+| val (yr0, 155 events) | C total | C image | image C, events ≤ 1 y removed | image C of the 37 events ≤ 1 y |
+|---|---|---|---|---|
+| joint s0 / s1 / s2 (yr0 only) | 0.712 / 0.697 / 0.736 | 0.679 / 0.658 / 0.709 | 0.661 / 0.647 / 0.692 | 0.732 / 0.690 / 0.759 |
+| **rounds s1** | **0.729** | **0.699** | **0.685** | 0.740 |
+
+S5 `--added-only`, test (155 events):
+
+| | η alone | clinical + η | ΔC [95% CI] | p_boot | ΔC after 1 y | ΔAUC 1/2/3/5 y |
+|---|---|---|---|---|---|---|
+| joint s1 (yr0) | 0.602 | 0.679 | +0.026 [−0.012, +0.061] | 0.085 | +0.026 | +0.023/+0.027/+0.013/+0.016 |
+| **rounds s1** | 0.639 | 0.681 | +0.027 [−0.013, +0.069] | 0.094 | +0.005 | +0.093/+0.048/+0.021/+0.018 |
+
+Reading (one seed): on val the same seed gains +0.032 C, in early AND later cancers (image C without ≤ 1 y
+events 0.647 → 0.685). On test ΔC is unchanged (+0.027 vs +0.026) and the gain moved to the first year
+(ΔAUC 1 y +0.093, ΔC after 1 y +0.005). Val gain not confirmed on test yet; wait for s0/s2 and the ensemble.
