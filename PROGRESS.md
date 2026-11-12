@@ -986,3 +986,35 @@ S5 `--added-only`, test (155 events):
 Reading (one seed): on val the same seed gains +0.032 C, in early AND later cancers (image C without ≤ 1 y
 events 0.647 → 0.685). On test ΔC is unchanged (+0.027 vs +0.026) and the gain moved to the first year
 (ΔAUC 1 y +0.093, ΔC after 1 y +0.005). Val gain not confirmed on test yet; wait for s0/s2 and the ensemble.
+
+## 2026-11-12: R3 all seeds + ensemble (T1/T2 in training)
+
+Jobs 7202876 (`rounds/joint_s0`) and 7202879 (`rounds/joint_s2`) ran after the GenomeDK CDU maintenance, ~60 s/epoch
+(s1 145 s/epoch: node contention, same data: 28,558 train scans, load 2,438 s). Best epochs 70 / 73 / 74.
+`rounds/joint_ens3/pred.csv` = mean of the three seeds' η, each z-scored on val (as `clinical_cox/joint_ens3`).
+Val η correlation between seeds: s0–s1 0.76, s0–s2 0.88, s1–s2 0.77 (yr0: 0.88 / 0.69 / 0.71).
+
+| val (yr0, 155 events) | C total | C image | image C, events ≤ 1 y removed |
+|---|---|---|---|
+| yr0 joint s0 / s1 / s2 | 0.712 / 0.697 / 0.736 | 0.679 / 0.658 / 0.709 | 0.661 / 0.647 / 0.692 |
+| yr0 ensemble | | 0.696 | 0.676 |
+| **rounds s0 / s1 / s2** | 0.739 / 0.729 / 0.725 | 0.724 / 0.699 / 0.701 | 0.706 / 0.685 / 0.672 |
+| **rounds ensemble** | | **0.719** | **0.697** |
+
+S5 `--added-only`, test (155 events; clinical alone C 0.654):
+
+| | η alone | clinical + η | ΔC [95% CI] | p_boot | ΔC after 1 y | ΔAUC 1/2/3/5 y |
+|---|---|---|---|---|---|---|
+| rounds s0 | 0.671 | 0.702 | +0.048 [+0.014, +0.086] | 0.005 | +0.028 | +0.110/+0.050/+0.039/+0.042 |
+| rounds s1 | 0.639 | 0.681 | +0.027 [−0.013, +0.069] | 0.094 | +0.005 | +0.093/+0.048/+0.021/+0.018 |
+| rounds s2 | 0.645 | 0.678 | +0.024 [−0.011, +0.064] | 0.097 | +0.010 | +0.066/+0.024/+0.015/+0.013 |
+| mean of seeds | | | +0.033 | | +0.014 | |
+| **rounds ensemble** | 0.664 | 0.692 | **+0.038 [−0.000, +0.080]** | 0.026 | +0.018 | +0.101/+0.047/+0.030/+0.029 |
+| yr0 ensemble (`joint_ens3`) | 0.646 | 0.697 | +0.043 [+0.007, +0.084] | 0.014 | +0.034 | +0.073/+0.052/+0.033/+0.034 |
+
+**Reading.** Adding the T1/T2 scans helps on val (ensemble image C +0.023, also without the ≤ 1 y events) but
+not on test: ΔC of the ensemble +0.038 vs +0.043 (yr0), mean of seeds +0.033 vs +0.037; CIs overlap
+completely. On test the image gain moves to the first year (ΔAUC 1 y +0.101 vs +0.073) and is smaller
+later (ΔC after 1 y +0.018 vs +0.034). Seeds are more alike (η corr 0.76–0.88). The val gain is the
+only positive sign; with one val set used for epoch selection, and test not confirming it, T1/T2 as done
+here (one random scan per patient per epoch) is no clear improvement. Model differences not tested.

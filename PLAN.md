@@ -218,7 +218,10 @@ weigh the same whatever their number of scans; input = the segmented lungs as be
 - **R2 S14 run** ✅ (2026-11-02, cluster worktree): 34,619 scans of 13,893 pts; train 11,442 / 8,600 / 8,516
   scans (724 / 419 / 329 events) for yr0 / yr1 / yr2; 100 later-round scans dropped (time ≤ 0, 2 events).
   Train patients with 1 / 2 / 3 scans: 1,185 / 3,398 / 6,859. CPU smoke ⬜.
-- **R3 runs** s1 ✅ (job 7202878): val C 0.729 (yr0 joint_s1 0.697); test ΔC +0.027 [−0.013, +0.069]
-  (yr0 +0.026), gain moved to year 1 (ΔC after 1 y +0.005). s0/s2 ⬜ held by maintenance. `rounds/joint_s0–s2` (`sbatch --mem 160g`, staggered), then S5 + 3-seed ensemble.
-  Compare ΔC over clinical with `joint` s0/s1/s2 (+0.035/+0.026/+0.049) and `joint_ens3` (+0.043 [+0.007, +0.084]).
+- **R3 runs** ✅ (2026-11-12) `rounds/joint_s0–s2` + `rounds/joint_ens3`. Val: every seed better than
+  its yr0 twin except s2 (C total 0.739/0.729/0.725 vs 0.712/0.697/0.736; ensemble image C 0.719 vs 0.696).
+  Test ΔC over clinical s0/s1/s2 +0.048/+0.027/+0.024 (yr0 +0.035/+0.026/+0.049); **ensemble +0.038
+  [−0.000, +0.080]** (yr0 `joint_ens3` +0.043 [+0.007, +0.084]); ΔC after 1 y +0.018 (yr0 +0.034).
+  → T1/T2 improve val but **not test**; on test the gain shifts to year 1 (ΔAUC 1 y +0.101 vs +0.073).
+  Details PROGRESS 2026-11-12. Next ⬜ decide (user).
 
