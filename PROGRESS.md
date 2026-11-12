@@ -1026,4 +1026,4 @@ with time > 365 train; selection on val patients with time > 365 (= S5 `c_after_
 train 27,985 / 28,558 scans kept, events 1,072 / 1,472 (yr0 515, yr1 333, yr2 224); patients kept 11,169 — every
 kept later-round scan's patient also keeps yr0, so the event patients are the same 515 with or without T1/T2.
 T1/T2 add images 1–2 years closer to the same cancers, not new cancer patients. Val 2,401 patients, 118 events
-(of 155). Control arm: same flag on yr0 only. Not smoke-tested yet (no torch locally).
+(of 155). Control arm: same flag on yr0 only. CPU smoke ✅ on the login node (80-patient subset, both arms: scans/val filtered as expected, lr schedule completes, pred.csv all rows).
