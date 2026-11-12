@@ -225,3 +225,16 @@ weigh the same whatever their number of scans; input = the segmented lungs as be
   → T1/T2 improve val but **not test**; on test the gain shifts to year 1 (ΔAUC 1 y +0.101 vs +0.073).
   Details PROGRESS 2026-11-12. Next ⬜ decide (user).
 
+
+# Next: aim the joint CNN at later cancers (branch `joint-late`, 2026-11-12)
+
+Worktree `.claude/worktrees/joint-late` (from `joint-multiround` d56fc7f). Design: `docs/pipeline.md` §14.
+Why: with T1/T2 the test gain moved to year 1 (ΔC after 1 y +0.018 vs +0.034 yr0). User chose option 2:
+a T1/T2 variant aimed at cancers after the first year.
+
+- **L1 code** ✅ `s4_train.py --landmark-days 365`: train only on scans event-free and in follow-up 1 y
+  after the scan; β start, val loss/C, selection and train C on time > 365; pred.csv/S5 unchanged.
+  Train 27,985 scans (1,072 events) of 11,169 patients (515 event patients, as yr0-only); val 2,401 (118 events).
+- **L2 runs** ⬜ `late/rounds_s0–s2` (T1/T2 + landmark, `--mem 160g`) and `late/yr0_s0–s2` (yr0 + landmark,
+  control). Then S5 + 3-seed ensembles. Primary: test ΔC after 1 y and ΔAUC 2/3/5 y vs `joint_ens3`
+  (+0.034; +0.052/+0.033/+0.034) and `rounds/joint_ens3` (+0.018; +0.047/+0.030/+0.029).

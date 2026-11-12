@@ -41,6 +41,14 @@ Recipe (all defaults; every one is a CLI flag):
              train scans are held in host RAM (~68 GB: sbatch --mem 160g).
              Val, test, train C and pred.csv stay yr0 (cohort.csv); the clinical
              mean/SD and beta start are still fitted on the yr0 train rows
+  landmark   --landmark-days L (default 0 = off): aim at cancers diagnosed more than
+             L days after a scan. Training uses only the scans still event-free
+             and in follow-up L days after the scan (time > L); a cancer within
+             L days of a scan drops that scan, not the patient's earlier scans.
+             The clinical beta start is fitted on the yr0 train rows with time > L.
+             Val loss/C (and so selection) and train C use the val/train
+             patients with time > L (= S5's c_after_1y for L = 365); history
+             also logs val_c_all (all val patients). pred.csv is unchanged
 No hyper-parameter search: this is the baseline to build on.
 The first run (runs/baseline, 2026-10-05) used the old defaults:
   --schedule constant --lr 3e-4 --epochs 60 --patience 12
@@ -69,6 +77,8 @@ Usage:
     sbatch src/submit_s4_train.sh --run-name clinical_cox/offset --clinical age,sex,cigsmok,lung_ml,lung_mean_hu
     sbatch --mem 160g src/submit_s4_train.sh --run-name rounds/joint_s0 --clinical age,sex,cigsmok,lung_ml,lung_mean_hu \
         --clinical-mode joint --train-scans ../data/rounds_cohort.csv
+    sbatch --mem 160g src/submit_s4_train.sh --run-name late/rounds_s0 --clinical age,sex,cigsmok,lung_ml,lung_mean_hu \
+        --clinical-mode joint --train-scans ../data/rounds_cohort.csv --landmark-days 365
 An existing run directory with a model.pt is never overwritten (pick a new
 --run-name, or pass --overwrite).
     env/.venv/bin/python src/s4_train.py --smoke --device cpu \\
@@ -120,6 +130,8 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--train-scans", default="",
                     help="S14 rounds_cohort.csv: train on every round, one random scan per patient per epoch")
     ap.add_argument("--rounds-cache", default=str(SSL_CACHE_NPY), help="yr1/yr2 volumes (S7)")
+    ap.add_argument("--landmark-days", type=int, default=0,
+                    help="train/select only on scans event-free and in follow-up this many days after the scan; 0 = off")
     ap.add_argument("--no-aug", action="store_true")
     ap.add_argument("--n-train-eval", type=int, default=2000,
                     help="train patients scored in eval mode each epoch (train C)")
@@ -285,7 +297,6 @@ def main() -> None:
     tr = tr.sort_values("row")
     if a.train_scans:  # every round; x_tr/t_tr/e_tr/z_tr are per scan, tr_pos = the yr0 rows
         trs, x_tr, tr_pos = load_train_scans(a.train_scans, tr, cache, a.rounds_cache)
-        patient = pd.factorize(trs["pid"])[0]
         print("train scans by round: " + trs["round"].value_counts().sort_index().to_json(), flush=True)
     else:
         trs, tr_pos = tr, np.arange(len(tr))
@@ -296,15 +307,26 @@ def main() -> None:
     t_tr = trs["time"].to_numpy(np.float32); e_tr = trs["event"].to_numpy(np.float32)
     t_va = va["time"].to_numpy(np.float32); e_va = va["event"].to_numpy(np.float32)
     sub = tr_pos[np.sort(rng.choice(len(tr), size=min(a.n_train_eval, len(tr)), replace=False))]
+    L = a.landmark_days
+    patient = pd.factorize(trs["pid"])[0]                 # one code per patient (yr0 only: per row)
+    use = np.flatnonzero(t_tr > L) if L else np.arange(len(trs))  # scans that may be trained on
+    vm = t_va > L if L else np.ones(len(va), bool)        # val patients in loss/C/selection
+    if L:
+        sub = sub[t_tr[sub] > L]
+        print(f"landmark {L} d: train scans {len(use)}/{len(trs)} ({int(e_tr[use].sum())} events), "
+              f"patients {len(np.unique(patient[use]))}/{len(tr)}; val {int(vm.sum())}/{len(va)} "
+              f"({int(e_va[vm].sum())} events)", flush=True)
+    t_vm, e_vm = t_va[vm], e_va[vm]
 
     clin = bool(a.clinical)
     z_tr = z_va = z_te = None
     model = LungCNN(dropout=a.dropout)
     if clin:
-        (_, z_va, z_te, z_tr), clin_info = clinical_design(tr, [va, te, trs], a.clinical)
+        tr_fit = tr[tr["time"] > L] if L else tr
+        (_, z_va, z_te, z_tr), clin_info = clinical_design(tr_fit, [va, te, trs], a.clinical)
         model = ClinicalCox(model, clin_info["beta_start"], train_beta=a.clinical_mode == "joint")
-        lp_va = z_va @ np.asarray(clin_info["beta_start"], np.float32)
-        clin_info.update({"val_c": harrell_c(lp_va, t_va, e_va), "val_loss": val_cox(lp_va, t_va, e_va)})
+        lp_va = (z_va @ np.asarray(clin_info["beta_start"], np.float32))[vm]
+        clin_info.update({"val_c": harrell_c(lp_va, t_vm, e_vm), "val_loss": val_cox(lp_va, t_vm, e_vm)})
         print("clinical-only Cox (train fit): " + json.dumps(clin_info), flush=True)
     model = model.to(device)
     ema_model = copy.deepcopy(model) if a.ema else None  # GroupNorm: parameters only, no buffers
@@ -325,14 +347,17 @@ def main() -> None:
         groups.append({"params": [model.beta], "weight_decay": 0.0})
     opt = torch.optim.AdamW(groups, lr=a.lr, weight_decay=a.weight_decay)
     n_params = sum(p.numel() for p in params)
-    steps_per_epoch = len(tr) // a.batch_size        # batch slots, incl. skipped ones
+    n_pick = len(np.unique(patient[use]))             # scans per epoch (one per patient)
+    steps_per_epoch = n_pick // a.batch_size          # batch slots, incl. skipped ones
     total_steps = a.epochs * steps_per_epoch
     warmup_steps = int(round(a.warmup_epochs * steps_per_epoch))
     step = 0
     cfg = {**vars(a), "n_params": n_params,
            "n_train": len(tr), "events_train": int(tr["event"].sum()),
            "n_train_scans": len(trs), "events_train_scans": int(e_tr.sum()),
-           "n_val": len(va), "events_val": int(e_va.sum())}
+           "n_train_used": len(use), "events_train_used": int(e_tr[use].sum()), "n_patients_used": n_pick,
+           "n_val": len(va), "events_val": int(e_va.sum()),
+           "n_val_used": int(vm.sum()), "events_val_used": int(e_vm.sum())}
     (out / "config.json").write_text(json.dumps(cfg, indent=2))
     print(json.dumps(cfg, indent=2), flush=True)
 
@@ -343,7 +368,7 @@ def main() -> None:
         if device.type == "cuda":
             torch.cuda.reset_peak_memory_stats(device)
         losses, skipped = [], 0
-        pick = one_scan_per_patient(rng, patient) if a.train_scans else np.arange(len(e_tr))
+        pick = use[one_scan_per_patient(rng, patient[use])] if a.train_scans else use
         for b in epoch_batches(rng, e_tr[pick], a.batch_size, a.events_per_batch):
             b = np.sort(pick[b])
             lr = lr_at(step, total_steps, warmup_steps, a.lr, a.schedule, a.min_lr)
@@ -373,14 +398,16 @@ def main() -> None:
                         pe.lerp_(p, 1.0 - d)
 
         eta_va, img_va = score(eval_model, x_va, z_va)
+        eta_all = eta_va
+        eta_va, img_va = eta_va[vm], img_va[vm]          # the landmark val patients (all if off)
         eta_sub, _ = score(eval_model, x_tr, z_tr, idx=sub)
         row = {
             "epoch": epoch,
             "train_loss": float(np.mean(losses)) if losses else float("nan"),
-            "val_loss": val_cox(eta_va, t_va, e_va),
-            "val_loss_null": val_cox(np.zeros_like(eta_va), t_va, e_va),
+            "val_loss": val_cox(eta_va, t_vm, e_vm),
+            "val_loss_null": val_cox(np.zeros_like(eta_va), t_vm, e_vm),
             "train_c": harrell_c(eta_sub, t_tr[sub], e_tr[sub]),
-            "val_c": harrell_c(eta_va, t_va, e_va),
+            "val_c": harrell_c(eta_va, t_vm, e_vm),
             "val_eta_sd": float(eta_va.std()),
             "lr": opt.param_groups[0]["lr"],
             "skipped_batches": skipped,
@@ -388,12 +415,14 @@ def main() -> None:
             "sec": round(time.time() - t0, 1),
         }
         if clin:  # the image part alone, and the clinical-only references (constant if offset)
-            row["val_c_img"] = harrell_c(img_va, t_va, e_va)
-            row["val_c_clin"] = harrell_c(eta_va - img_va, t_va, e_va)
-            row["val_loss_clin"] = val_cox(eta_va - img_va, t_va, e_va)
+            row["val_c_img"] = harrell_c(img_va, t_vm, e_vm)
+            row["val_c_clin"] = harrell_c(eta_va - img_va, t_vm, e_vm)
+            row["val_loss_clin"] = val_cox(eta_va - img_va, t_vm, e_vm)
             row["val_img_sd"] = float(img_va.std())
+        if L:
+            row["val_c_all"] = harrell_c(eta_all, t_va, e_va)
         if a.ema:
-            row["val_c_raw"] = harrell_c(score(model, x_va, z_va)[0], t_va, e_va)
+            row["val_c_raw"] = harrell_c(score(model, x_va, z_va)[0][vm], t_vm, e_vm)
         hist.append(row)
         pd.DataFrame(hist).to_csv(out / "history.csv", index=False)
         improved = row["val_c"] > best_c  # NaN (no val events, smoke) never improves

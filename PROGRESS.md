@@ -1018,3 +1018,12 @@ completely. On test the image gain moves to the first year (ΔAUC 1 y +0.101 vs 
 later (ΔC after 1 y +0.018 vs +0.034). Seeds are more alike (η corr 0.76–0.88). The val gain is the
 only positive sign; with one val set used for epoch selection, and test not confirming it, T1/T2 as done
 here (one random scan per patient per epoch) is no clear improvement. Model differences not tested.
+
+## 2026-11-12: landmark variant aimed at later cancers (branch `joint-late`)
+
+User picked "a T1/T2 variant aimed at later cancers". `s4_train.py --landmark-days 365` (docs §14): only scans
+with time > 365 train; selection on val patients with time > 365 (= S5 `c_after_1y`). Counts (cluster):
+train 27,985 / 28,558 scans kept, events 1,072 / 1,472 (yr0 515, yr1 333, yr2 224); patients kept 11,169 — every
+kept later-round scan's patient also keeps yr0, so the event patients are the same 515 with or without T1/T2.
+T1/T2 add images 1–2 years closer to the same cancers, not new cancer patients. Val 2,401 patients, 118 events
+(of 155). Control arm: same flag on yr0 only. Not smoke-tested yet (no torch locally).

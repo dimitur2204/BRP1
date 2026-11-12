@@ -631,3 +631,32 @@ sbatch --mem 160g src/submit_s4_train.sh --run-name rounds/joint_s0 --seed 0 \
 # s1, s2: same with --seed 1/2 and --begin=now+30minutes / +60minutes (staggered loads)
 env/.venv/bin/python src/s5_evaluate.py --run rounds/joint_s0
 ```
+
+## 14. Aiming at later cancers: landmark training (`s4_train.py --landmark-days`, branch `joint-late`)
+
+Why: with every round in training (§13) val improved, but on test the added value moved to the first
+year (ΔAUC 1 y +0.101) and shrank after it (ΔC after 1 y +0.018 vs +0.034 for the yr0-only ensemble).
+Cancers diagnosed within a year of a scan are mostly already visible on it; the goal is general lung
+risk (future cancer), so this variant trains and selects only on what happens **after 1 year**.
+
+| choice | value | why |
+|---|---|---|
+| training scans | only scans with time > 365 d (event-free and in follow-up 1 y after that scan) | a Cox model on these = risk of cancer after 1 y, given none before (landmark at 1 y) |
+| earlier scans of the same patient | kept | a cancer 0.5 y after yr2 drops the yr2 scan, but its yr0/yr1 scans stay events (2.5 / 1.5 y): the model learns from images taken before the cancer was visible |
+| weighting | one random scan per patient per epoch among the kept scans (as §13); steps per epoch from the patients kept | lr schedule still completes |
+| clinical β start, standardisation | Cox fit on the yr0 train rows with time > 365 | the same target as the image part |
+| selection, val loss/C, train C | val (train-subset) patients with time > 365 | = S5's `c_after_1y`; selecting on all val would favour early-cancer detection again. `val_c_all` is logged |
+| `pred.csv`, S5 | unchanged (every patient, all splits) | test ΔC, ΔC after 1 y and AUCs compare directly with §11/§13 |
+| control | the same flag without `--train-scans` (yr0 only) | separates the effect of the landmark from that of the T1/T2 scans |
+
+Expected cost: overall C (incl. the first year) may drop; the primary comparison is test ΔC after 1 y
+and ΔAUC at 2/3/5 y. Note this undoes, for this variant only, the 2026-11-02 choice of keeping early
+cancers (§13) — that choice still holds for `rounds/`.
+
+```bash
+sbatch --mem 160g src/submit_s4_train.sh --run-name late/rounds_s0 --seed 0 \
+    --clinical age,sex,cigsmok,lung_ml,lung_mean_hu --clinical-mode joint \
+    --train-scans ../data/rounds_cohort.csv --landmark-days 365
+sbatch src/submit_s4_train.sh --run-name late/yr0_s0 --seed 0 \
+    --clinical age,sex,cigsmok,lung_ml,lung_mean_hu --clinical-mode joint --landmark-days 365
+```
