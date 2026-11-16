@@ -1099,3 +1099,30 @@ train subset with whole-subset risk sets, + its η=0 value), plotted as "train s
 CPU smoke ✅ (login node, 48-patient subset, `--smoke --clinical-mode joint`, no `--train-scans`/`--landmark-days`):
 runs end to end, `train_loss_eval`/`_null` logged, `curves.png` shows train-subset vs val relative loss + batch loss on
 the twin axis.
+
+## 2026-11-16: J2/J3 results (120 epochs, lr floor 1e-4)
+
+Jobs: s1 8614569 (L40S); s0 8614568 got the CUDA-less GPU on gn-1002 again (`cuda False`) → cancelled, rerun
+as 8617702 on `gpu-h200`; s2 8617703 on `gpu-h200`. `long/e120_ens3/pred.csv` = mean of the three seeds' image η,
+each z-scored on val (as `joint_ens3`). S5 `--added-only` on the login node (`logs/s5_long.log`).
+
+Training (curves.png, new train-subset loss): s0 image part collapsed twice at high lr (ep ~35–45, ep 65) and never
+recovered its peak; s1 kept improving to ep 100 (train/val relative loss close until ~110); s2 overfits from ~ep 90
+(train C 0.80 → 0.87, train-subset relative loss −0.64 → −1.25, val flat −0.39 → −0.35).
+
+| run | best ep | val C | test ΔC over clinical [95% CI] | p | ΔC after 1 y | ΔAUC 1 y / 2 y | η alone test C |
+|---|---|---|---|---|---|---|---|
+| e120_s0 | 65 | 0.686 | +0.038 [+0.006, +0.071] | 0.008 | +0.039 | +0.034 / +0.025 | 0.628 |
+| e120_s1 | 100 | 0.740 | +0.046 [+0.012, +0.085] | 0.002 | +0.020 | +0.124 / +0.058 | 0.659 |
+| e120_s2 | 97 | 0.732 | +0.015 [−0.022, +0.051] | 0.19 | −0.008 | +0.084 / +0.031 | 0.636 |
+| **e120_ens3** | | | **+0.041 [+0.002, +0.083]** | 0.022 | +0.021 | +0.101 / +0.052 | 0.663 |
+| joint (80 ep, s0) | 68 | 0.712 | +0.035 [−0.002, +0.075] | 0.033 | +0.034 | +0.037 / +0.041 | 0.625 |
+| joint_s1 | 74 | 0.697 | +0.025 [−0.012, +0.061] | 0.085 | +0.026 | +0.023 / +0.027 | 0.602 |
+| joint_s2 | 74 | 0.736 | +0.049 [+0.013, +0.090] | 0.007 | +0.031 | +0.103 / +0.050 | 0.667 |
+| `joint_ens3` (ref) | | | +0.043 [+0.007, +0.084] | 0.014 | +0.034 | +0.073 / +0.052 | 0.646 |
+
+**Reading.** Longer training does not raise the added value: ensemble ΔC +0.041 vs +0.043. Per seed it is a reshuffle
+(s1 +0.021, s2 −0.034, s0 +0.003), and val C does not predict the test change (s2: val 0.732 but test ΔC +0.015). What
+does change is *where* the gain is: ΔAUC 1 y +0.101 vs +0.073 and ΔC after 1 y +0.021 vs +0.034, i.e. the extra epochs
+mostly fit the cancers already visible on T0 — the opposite of the general-lung-risk goal. The higher lr in the
+middle (floor + longer cosine) also destabilised s0. The 80-epoch recipe stays the reference.

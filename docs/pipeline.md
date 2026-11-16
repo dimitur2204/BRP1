@@ -692,3 +692,10 @@ sbatch --begin=now+60minutes src/submit_s4_train.sh --run-name long/e120_s2 --se
 What to look at: (1) do val C / val loss flatten before epoch 120 (converged) or still rise (still
 undertrained → longer or higher floor); (2) the train-subset vs val relative-loss gap; (3) S5 test ΔC over
 clinical of each seed and of `long/e120_ens3` vs `joint_ens3` (+0.043 [+0.007, +0.084]), and ΔC after 1 y.
+
+Result (2026-11-16, PROGRESS): no gain. Test ΔC over clinical `long/e120_ens3` +0.041 [+0.002, +0.083] vs `joint_ens3`
++0.043 [+0.007, +0.084]; seeds +0.038/+0.046/+0.015 (80 ep: +0.035/+0.025/+0.049). Not converged in the sense hoped
+for: s2 overfits from epoch ~90 (train-subset loss keeps falling, val flat), s0's image part collapsed at high lr,
+only s1 improved to epoch ~100. The extra epochs move the gain towards year-1 cancers (ΔAUC 1 y +0.101 vs +0.073,
+ΔC after 1 y +0.021 vs +0.034). The 80-epoch, floor-0 recipe (§5, §11) stays the reference; the
+`train_loss_eval` columns stay as the convergence check.
