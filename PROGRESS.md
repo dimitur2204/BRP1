@@ -1095,3 +1095,7 @@ the 80-epoch cosine cuts training short. Plan (§15): same recipe, 120 epochs, c
 Code: `s4_train.py` logs `train_loss_eval` and `train_loss_eval_null` (eval-mode Cox loss on the fixed 2,000-patient
 train subset with whole-subset risk sets, + its η=0 value), plotted as "train subset (eval) − its η=0" next to
 "val − val(η=0)" in `curves.png`; the batch train loss (~3.1–3.3, not comparable) moved to a grey twin axis.
+
+CPU smoke ✅ (login node, 48-patient subset, `--smoke --clinical-mode joint`, no `--train-scans`/`--landmark-days`):
+runs end to end, `train_loss_eval`/`_null` logged, `curves.png` shows train-subset vs val relative loss + batch loss on
+the twin axis.
