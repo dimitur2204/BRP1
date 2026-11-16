@@ -660,3 +660,7 @@ sbatch --mem 160g src/submit_s4_train.sh --run-name late/rounds_s0 --seed 0 \
 sbatch src/submit_s4_train.sh --run-name late/yr0_s0 --seed 0 \
     --clinical age,sex,cigsmok,lung_ml,lung_mean_hu --clinical-mode joint --landmark-days 365
 ```
+
+Result (2026-11-13, PROGRESS): test ΔC over clinical `late/yr0_ens3` +0.041 [+0.006, +0.076] (`joint_ens3`
++0.043), ΔC after 1 y +0.046 (+0.034), ΔAUC 1 y +0.023 (+0.073): the year-1 signal goes, the overall added value
+stays; the after-1-y gain is within the CIs. T1/T2 + landmark (2 seeds; seed 0 lost to a faulty GPU) no gain.

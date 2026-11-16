@@ -235,6 +235,16 @@ a T1/T2 variant aimed at cancers after the first year.
 - **L1 code** ✅ `s4_train.py --landmark-days 365`: train only on scans event-free and in follow-up 1 y
   after the scan; β start, val loss/C, selection and train C on time > 365; pred.csv/S5 unchanged.
   Train 27,985 scans (1,072 events) of 11,169 patients (515 event patients, as yr0-only); val 2,401 (118 events).
-- **L2 runs** ⬜ `late/rounds_s0–s2` (T1/T2 + landmark, `--mem 160g`) and `late/yr0_s0–s2` (yr0 + landmark,
-  control). Then S5 + 3-seed ensembles. Primary: test ΔC after 1 y and ΔAUC 2/3/5 y vs `joint_ens3`
-  (+0.034; +0.052/+0.033/+0.034) and `rounds/joint_ens3` (+0.018; +0.047/+0.030/+0.029).
+- **L2 runs** ✅ 5/6 (2026-11-13): `late/yr0_s0–s2`, `late/yr0_ens3`, `late/rounds_s1–s2`. `late/rounds_s0`
+  failed twice on gn-1002 (jobs 8208544, 8313987: torch saw no CUDA → CPU → 12 h timeout); **dropped** (user,
+  2026-11-16). Test ΔC after 1 y: yr0 s0/s1/s2 +0.018/+0.042/+0.041, **ens +0.046** (`joint_ens3` +0.034); rounds
+  s1/s2 +0.038/+0.004. ΔC overall ens +0.041 [+0.006, +0.076] (`joint_ens3` +0.043). Val does not show the after-1-y
+  gain (image C without ≤ 1 y events 0.680 vs 0.676). Seed spread large. Details PROGRESS 2026-11-13.
+- **Conclusion** (2026-11-16, user: close L2 and go on): neither change raises the overall added value (ΔC ≈ +0.04
+  in every joint ensemble). T1/T2 only move the gain to year-1 cancers (no landmark) or do nothing (landmark). The
+  landmark keeps ΔC while relying less on visible tumours (ΔAUC 1 y +0.023 vs +0.073); its after-1-y gain (+0.012)
+  is not shown on val and is untested (no paired test). `late/yr0_ens3` is the run most in line with the goal.
+- **L3 (proposed)** ⬜ no GPU: one S5 table for `joint_ens3`, `rounds/joint_ens3`, `late/yr0_ens3` with
+  (a) the reference = clinical + T0 radiologist read (`data/t0_findings.csv`, §12; the A-section ⬜) and
+  (b) paired bootstrap of the model differences (ΔC, ΔC after 1 y) on the same test patients. Answers whether
+  the CNN adds anything beyond what the radiologist saw, and whether the landmark is really better.

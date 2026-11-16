@@ -1027,3 +1027,53 @@ train 27,985 / 28,558 scans kept, events 1,072 / 1,472 (yr0 515, yr1 333, yr2 22
 kept later-round scan's patient also keeps yr0, so the event patients are the same 515 with or without T1/T2.
 T1/T2 add images 1–2 years closer to the same cancers, not new cancer patients. Val 2,401 patients, 118 events
 (of 155). Control arm: same flag on yr0 only. CPU smoke ✅ on the login node (80-patient subset, both arms: scans/val filtered as expected, lr schedule completes, pred.csv all rows).
+
+## 2026-11-13: landmark runs (L2) results
+
+Jobs 8208545–49 done (~1.3–1.7 h). `late/rounds_s0` (8208544): allocated a GPU on gn-1002 but
+`torch.cuda.is_available()` False → trained on CPU (~3,000 s/epoch), cancelled at the 12 h limit at epoch 13, no model.
+Best epochs (val C on time > 365): yr0 s0/s1/s2 51/69/68, rounds s1/s2 71/50. `late/yr0_ens3/pred.csv` = mean of the
+three seeds' image η, each z-scored on val (as `joint_ens3`).
+
+Val (yr0, 155 events; from pred.csv, same definitions as 2026-11-12):
+
+| val | image C | image C, events ≤ 1 y removed | C total | AUC of η, events ≤ 1 y vs controls |
+|---|---|---|---|---|
+| yr0 joint s0/s1/s2 | 0.679 / 0.658 / 0.709 | 0.661 / 0.647 / 0.692 | 0.712 / 0.697 / 0.736 | 0.74 / 0.70 / 0.77 |
+| `joint_ens3` / `rounds/joint_ens3` | 0.696 / 0.719 | 0.676 / 0.697 | | 0.76 / 0.79 |
+| late/yr0 s0/s1/s2 | 0.624 / 0.645 / 0.642 | 0.633 / 0.650 / 0.643 | 0.665 / 0.689 / 0.688 | 0.60 / 0.64 / 0.65 |
+| late/yr0_ens3 | 0.675 | 0.680 | | 0.67 |
+| late/rounds s1/s2 | 0.632 / 0.658 | 0.657 / 0.664 | 0.670 / 0.677 | 0.57 / 0.65 |
+
+S5 `--added-only`, test (155 events; clinical C 0.654, after 1 y 0.651):
+
+| | η alone | clinical + η | ΔC [95% CI] | p_boot | ΔC after 1 y | ΔAUC 1/2/3/5 y |
+|---|---|---|---|---|---|---|
+| late/yr0 s0 | 0.579 | 0.663 | +0.009 [−0.014, +0.033] | 0.228 | +0.018 | −0.018/−0.010/−0.009/+0.008 |
+| late/yr0 s1 | 0.641 | 0.699 | +0.045 [+0.013, +0.081] | 0.002 | +0.042 | +0.055/+0.044/+0.027/+0.038 |
+| late/yr0 s2 | 0.630 | 0.697 | +0.043 [+0.013, +0.074] | 0.003 | +0.041 | +0.050/+0.039/+0.033/+0.039 |
+| **late/yr0_ens3** | 0.641 | 0.694 | **+0.041 [+0.006, +0.076]** | 0.012 | **+0.046** | +0.023/+0.029/+0.019/+0.035 |
+| late/rounds s1 | 0.637 | 0.687 | +0.033 [+0.003, +0.062] | 0.015 | +0.038 | +0.016/+0.023/+0.012/+0.026 |
+| late/rounds s2 | 0.582 | 0.648 | −0.006 [−0.036, +0.027] | 0.642 | +0.004 | −0.034/−0.025/−0.036/−0.017 |
+| `joint_ens3` (ref) | 0.646 | 0.697 | +0.043 [+0.007, +0.084] | 0.014 | +0.034 | +0.073/+0.052/+0.033/+0.034 |
+| `rounds/joint_ens3` (ref) | 0.664 | 0.692 | +0.038 [−0.000, +0.080] | 0.026 | +0.018 | +0.101/+0.047/+0.030/+0.029 |
+
+**Reading.** The landmark loss removes the early signal as intended (val AUC of ≤ 1 y events 0.76–0.79 → 0.57–0.67;
+test ΔAUC 1 y +0.023 vs +0.073/+0.101). On test the yr0 landmark ensemble has the highest ΔC after 1 y so far
+(+0.046 vs +0.034) at the same overall ΔC (+0.041 vs +0.043), but val does not show it (image C without ≤ 1 y events
+0.680 vs 0.676), seeds are unstable (s0 and rounds_s2 ≈ 0 on test), and ΔAUC 2/3/5 y is not above `joint_ens3`.
+T1/T2 + landmark: 2 seeds, no sign of a gain. No paired model-difference test; the after-1-y difference vs
+`joint_ens3` (+0.012) is well inside the CIs.
+
+## 2026-11-16: L2 closed
+
+`late/rounds_s0` resubmitted as job 8313987 (`-p gpu-l40s`; `--exclude gn-1002` is impossible, gn-1002 is the only
+`gpu`/`gpu-l40s` node) failed the same way: gn-1002, `cuda False`, CPU, 12 h timeout at epoch 13. Only these two jobs
+lost CUDA (all other November jobs on gn-1002 had it); both started at submit time, so likely one faulty GPU on
+gn-1002. If a rerun is ever needed: `-p gpu-h200`. User: drop it and go on; `late/rounds` stays at 2 seeds.
+
+Conclusion (user-facing summary): adding T1/T2 does not raise the added value over clinical overall (+0.038 vs
++0.043) and moves the gain to year-1 cancers; with the landmark, the two T1/T2 seeds show no gain. Training only on
+cancers after the first year keeps the overall added value (+0.041) and cuts the year-1 detection signal (ΔAUC 1 y
++0.023 vs +0.073); the after-1-y gain (+0.046 vs +0.034) is within the CIs, not confirmed on val, and not
+paired-tested. Proposed next (PLAN L3): S5 against clinical + T0 radiologist read + paired model-difference bootstrap.
