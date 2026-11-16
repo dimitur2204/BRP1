@@ -664,3 +664,31 @@ sbatch src/submit_s4_train.sh --run-name late/yr0_s0 --seed 0 \
 Result (2026-11-13, PROGRESS): test ΔC over clinical `late/yr0_ens3` +0.041 [+0.006, +0.076] (`joint_ens3`
 +0.043), ΔC after 1 y +0.046 (+0.034), ΔAUC 1 y +0.023 (+0.073): the year-1 signal goes, the overall added value
 stays; the after-1-y gain is within the CIs. T1/T2 + landmark (2 seeds; seed 0 lost to a faulty GPU) no gain.
+
+## 15. Longer training with an lr floor (`s4_train.py --epochs 120 --min-lr 1e-4`, branch `joint-long`)
+
+Why (2026-11-16): in all three yr0 joint runs (`clinical_cox/joint{,_s1,_s2}`) the image part only starts
+to learn after ~20–35 epochs (val image-η SD < 0.1 before, 0.4–0.6 at the end), and val C and val loss are
+**still improving when the cosine reaches ~0** (s2: val C 0.720 → 0.735 over epochs 51–80, val loss still
+falling; best epochs 68/74/74). From epoch 65 the lr is < 1e-4 and from 72 < 3e-5, so the last epochs barely move the weights. So the
+recipe is cut short by its schedule, not converged. (The §5 note that a floor does not matter was measured
+on `cosine`, the image-only model, whose end was flat.)
+
+| choice | value | why |
+|---|---|---|
+| everything else | the `joint_s2` recipe (yr0, `--clinical-mode joint`, peak 1e-3, 3 warm-up epochs, batch 32, dropout 0.3, wd 1e-2, best val C) | one change at a time, so the comparison with `joint_ens3` is about length + schedule only |
+| length | 120 epochs (1.5×) | the image part learns between ~epoch 20 and the end; 1.5× gives it ~60 more epochs at a useful lr. ~2.2 h + load, so partition `gpu` (12 h), not `gpu-short` |
+| lr floor | cosine from 1e-3 down to `--min-lr 1e-4` (10% of peak) instead of 0 | the lr never falls below the level at which the joint runs still improved, so there is no dead tail; the cosine shape still lowers it gradually |
+| seeds | 0, 1, 2 + their ensemble | single seeds of this recipe spread by ±0.02 in test ΔC; the reference is `joint_ens3` |
+| convergence check | new history columns `train_loss_eval`, `train_loss_eval_null`: the Cox loss of the fixed 2,000-patient train subset in eval mode with whole-subset risk sets | the logged `train_loss` (batch-of-32 risk sets, augmented, dropout on) is on a different scale from val loss and cannot show a gap. `train_loss_eval − its η=0` vs `val_loss − its η=0` (same plot, left panel of `curves.png`) does: both should fall and flatten; a widening gap is overfitting |
+
+```bash
+CL="--clinical age,sex,cigsmok,lung_ml,lung_mean_hu --clinical-mode joint"
+sbatch src/submit_s4_train.sh --run-name long/e120_s0 --seed 0 --epochs 120 --min-lr 1e-4 $CL
+sbatch --begin=now+30minutes src/submit_s4_train.sh --run-name long/e120_s1 --seed 1 --epochs 120 --min-lr 1e-4 $CL
+sbatch --begin=now+60minutes src/submit_s4_train.sh --run-name long/e120_s2 --seed 2 --epochs 120 --min-lr 1e-4 $CL
+```
+
+What to look at: (1) do val C / val loss flatten before epoch 120 (converged) or still rise (still
+undertrained → longer or higher floor); (2) the train-subset vs val relative-loss gap; (3) S5 test ΔC over
+clinical of each seed and of `long/e120_ens3` vs `joint_ens3` (+0.043 [+0.007, +0.084]), and ΔC after 1 y.

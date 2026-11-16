@@ -56,8 +56,9 @@ The first run (runs/baseline, 2026-10-05) used the old defaults:
 Outputs, runs/{run_name}/:
   config.json   the arguments + cohort sizes
   history.csv   per epoch: train loss, val loss (whole-split risk sets) and its
-                eta=0 baseline, train C (eval mode, fixed 2,000-patient
-                subset), val C (and val_c_raw, the non-EMA weights, with
+                eta=0 baseline, train loss + its eta=0 baseline and train C
+                (eval mode, fixed 2,000-patient subset, whole-subset risk
+                sets: comparable to val), val C (and val_c_raw, the non-EMA weights, with
                 --ema), learning rate at the end of the epoch, peak GPU
                 memory, seconds
   model.pt      the selected weights (EMA weights with --ema)
@@ -246,12 +247,17 @@ def plot_curves(hist: pd.DataFrame, path, title: str, selected: int) -> None:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     fig, (a1, a2, a3) = plt.subplots(1, 3, figsize=(15, 4))
-    a1.plot(hist.epoch, hist.train_loss, label="train (batch risk sets, aug)")
+    tw = a1.twinx()  # the batch loss sits ~3 units higher: own axis
+    tw.plot(hist.epoch, hist.train_loss, color="lightgrey", lw=0.8, label="train (batch risk sets, aug)")
+    tw.set_ylabel("train batch loss", color="grey"); tw.legend(fontsize=8, loc="upper right")
     a1.plot(hist.epoch, hist.val_loss - hist.val_loss_null, label="val - val(eta=0)")
+    if "train_loss_eval" in hist:  # same whole-set risk sets as val, eval mode: comparable to val
+        a1.plot(hist.epoch, hist.train_loss_eval - hist.train_loss_eval_null,
+                label="train subset (eval) - its eta=0")
     if "val_loss_clin" in hist:
         a1.plot(hist.epoch, hist.val_loss_clin - hist.val_loss_null, ls="--", label="val, clinical part only")
     a1.axhline(0, color="grey", lw=0.8)
-    a1.set_xlabel("epoch"); a1.set_ylabel("Cox loss per event"); a1.legend(fontsize=8)
+    a1.set_xlabel("epoch"); a1.set_ylabel("Cox loss per event"); a1.legend(fontsize=8, loc="lower left")
     a1.set_title("loss (val shown relative to a constant score)", fontsize=9)
     a2.plot(hist.epoch, hist.train_c, label="train C (eval mode, subset)")
     a2.plot(hist.epoch, hist.val_c, label="val C (EMA)" if "val_c_raw" in hist else "val C")
@@ -406,6 +412,8 @@ def main() -> None:
             "train_loss": float(np.mean(losses)) if losses else float("nan"),
             "val_loss": val_cox(eta_va, t_vm, e_vm),
             "val_loss_null": val_cox(np.zeros_like(eta_va), t_vm, e_vm),
+            "train_loss_eval": val_cox(eta_sub, t_tr[sub], e_tr[sub]),
+            "train_loss_eval_null": val_cox(np.zeros_like(eta_sub), t_tr[sub], e_tr[sub]),
             "train_c": harrell_c(eta_sub, t_tr[sub], e_tr[sub]),
             "val_c": harrell_c(eta_va, t_vm, e_vm),
             "val_eta_sd": float(eta_va.std()),

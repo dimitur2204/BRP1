@@ -1077,3 +1077,21 @@ Conclusion (user-facing summary): adding T1/T2 does not raise the added value ov
 cancers after the first year keeps the overall added value (+0.041) and cuts the year-1 detection signal (ΔAUC 1 y
 +0.023 vs +0.073); the after-1-y gain (+0.046 vs +0.034) is within the CIs, not confirmed on val, and not
 paired-tested. Proposed next (PLAN L3): S5 against clinical + T0 radiologist read + paired model-difference bootstrap.
+
+## 2026-11-16: longer joint training (branch `joint-long`)
+
+Look at the 80-epoch yr0 joint runs' history (`plamen_pipeline/runs/clinical_cox/joint{,_s1,_s2}`):
+
+| run | val C ep 41 / 61 / 80 | val loss − null ep 41 / 61 / 80 | val image-η SD ep 16 / 41 / 80 | train C ep 80 |
+|---|---|---|---|---|
+| joint (s0) | 0.684 / 0.706 / 0.712 | −0.222 / −0.278 / −0.294 | 0.04 / 0.31 / 0.46 | 0.702 |
+| joint_s1 | 0.662 / 0.689 / 0.697 | −0.167 / −0.235 / −0.255 | 0.08 / 0.23 / 0.43 | 0.673 |
+| joint_s2 | 0.679 / 0.732 / 0.735 | −0.206 / −0.354 / −0.369 | 0.07 / 0.26 / 0.59 | 0.770 |
+
+The image part is almost silent for the first ~20–35 epochs; val C and val loss improve until the end (best epochs 68/74/74), at an lr
+already < 1e-4 from epoch 65. No overfitting (val loss never rises; train C ≈ val C for s0/s1, +0.035 for s2). So
+the 80-epoch cosine cuts training short. Plan (§15): same recipe, 120 epochs, cosine floor 1e-4, 3 seeds.
+
+Code: `s4_train.py` logs `train_loss_eval` and `train_loss_eval_null` (eval-mode Cox loss on the fixed 2,000-patient
+train subset with whole-subset risk sets, + its η=0 value), plotted as "train subset (eval) − its η=0" next to
+"val − val(η=0)" in `curves.png`; the batch train loss (~3.1–3.3, not comparable) moved to a grey twin axis.

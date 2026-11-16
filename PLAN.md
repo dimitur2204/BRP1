@@ -248,3 +248,17 @@ a T1/T2 variant aimed at cancers after the first year.
   (a) the reference = clinical + T0 radiologist read (`data/t0_findings.csv`, §12; the A-section ⬜) and
   (b) paired bootstrap of the model differences (ΔC, ΔC after 1 y) on the same test patients. Answers whether
   the CNN adds anything beyond what the radiologist saw, and whether the landmark is really better.
+
+
+# Next: train the joint CNN longer, without a dead lr tail (branch `joint-long`, 2026-11-16)
+
+Worktree `.claude/worktrees/joint-long` (from `joint-late` 1609470). Design: `docs/pipeline.md` §15.
+Why (user): in the 80-epoch joint runs the cosine reaches ~0 while val C / val loss are still improving
+(best epochs 68/74/74, image part starts learning only at epoch ~20–35). User: run the joint model longer
+(120 epochs), no stalling lr at the end, and check that train and val converge.
+
+- **J1 code** ✅ (2026-11-16) history logs `train_loss_eval` / `train_loss_eval_null` (eval-mode Cox loss of the
+  train subset, whole-subset risk sets = comparable to val); `curves.png` plots it next to val, batch loss on its
+  own axis. Recipe = `joint_s2` + `--epochs 120 --min-lr 1e-4` (no other code change).
+- **J2 runs** ⬜ `long/e120_s0–s2` (partition `gpu`, staggered 30 min; commands in §15) → `long/e120_ens3`.
+- **J3 eval** ⬜ curves (convergence, train/val gap), S5 per seed + ensemble vs `joint_ens3`.
